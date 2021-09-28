@@ -135,7 +135,7 @@ class IFUCube(object):
         """
         assert which_dist in ['t',
                               'x_t',
-                              'tx'
+                              'tx',
                               'z_tx',
                               'txz',
                               'x',
@@ -143,7 +143,7 @@ class IFUCube(object):
                               'tz_x',
                               'tz',
                               'v_tx',
-                              'tvxz'
+                              'tvxz',
                               'v_x',
                               'v']
         count = 0

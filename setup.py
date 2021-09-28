@@ -31,7 +31,7 @@ setuptools.setup(
     project_urls={
         "Source": "https://github.com/prashjet/popkinmocks/",
     },
-    python_requires=">=3.7",
+    python_requires=">=3.6",
     # use the already parsed requirements from requirements.txt
     install_requires=required,
     # extra requirements for testing
@@ -42,8 +42,6 @@ setuptools.setup(
         ]
     },
     package_data={
-        "popkinmocks": [
-            "../data/",
-        ]
+        "popkinmocks": ["../data/MILES_BASTI_CH_baseFe/*"]
     },
 )
