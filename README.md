@@ -4,3 +4,4 @@
 [![codecov](https://codecov.io/gh/prashjet/popkinmocks/branch/main/graph/badge.svg?token=Y7DD57E8NZ)](https://codecov.io/gh/prashjet/popkinmocks)
 
 Create mock IFU datacubes for stellar population and kinematic modelling.
+See the Jupyter notebookk `notebooks/popkinmocks.ipynb` for an example.
