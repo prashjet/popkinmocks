@@ -1128,6 +1128,10 @@ class stream(component):
         pdf = pdf_x * pdf_y
         pdf = np.sum(pdf, -1)
         pdf /= np.sum(pdf*cube.dx*cube.dy)
+        self.p_x_pars = dict(theta_lims=theta_lims,
+                             mu_r_lims=mu_r_lims,
+                             sig=sig,
+                             nsmp=nsmp)
         self.p_x = pdf
 
     def get_p_x(self, density=True, light_weighted=False):
@@ -1210,6 +1214,7 @@ class stream(component):
         p_z_t = cdf_z_tx[1:] - cdf_z_tx[:-1]
         p_z_t /= np.sum(p_z_t, 0)
         p_z_t /= del_log_z[:, np.newaxis]
+        self.p_z_t_pars = dict(t_dep=t_dep)
         self.p_z_t = p_z_t
 
     def get_p_z_t(self, density=True, light_weighted=False):
@@ -1370,6 +1375,7 @@ class stream(component):
         idx = np.where((th > min_th) & (th < max_th))
         mu_v[idx] = (th[idx]-min_th)/(max_th-min_th) * (mu_v_hi-mu_v_lo)
         mu_v[idx] += mu_v_lo
+        self.p_v_x_pars = dict(mu_v_lims=mu_v_lims, sig_v=sig_v)
         self.mu_v = mu_v
         self.sig_v = np.zeros_like(mu_v) + sig_v
 
