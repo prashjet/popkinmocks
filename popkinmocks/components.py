@@ -438,7 +438,7 @@ class growingDisk(component):
         # next three lines calculate alpha_lims just to add to `self.mu_v_pars`
         # to be able to compare `alpha_lims` with earlier implementations
         rmax_lims = np.array(rmax_lims)
-        sig_x_lims = np.array(rmax_lims)
+        sig_x_lims = np.array(sig_x_lims)
         alpha_lims = (rmax_lims/sig_x_lims+1.)/(rmax_lims/sig_x_lims)
         alpha = (rmax/sig_xp+1.)/(rmax/sig_xp)
         vmax = self.linear_interpolate_t(*vmax_lims)
