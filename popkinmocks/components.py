@@ -11,7 +11,18 @@ class component(ABC):
 
     A component is specified by it's joint density p(t,x,v,z) over stellar age
     t, 2D position x, line-of-sight velocity v, and metallicity z. Sub-classes
-    correspond to specific factorisations of the joint density.
+    of `component` correspond to specific (i) factorisations of the joint
+    density and, (ii) implementations of the factors. Some details of p(t,x,v,z)
+    are shared between all components:
+    - the star formation history is independent of other variables - i.e. one
+    can factor p(t,x,v,z) = p(t) ...,
+    - p(t) is a beta distribution,
+    - age-metallicity relations from chemical evolution model from eqns 3-10
+    of Zhu et al 2020, parameterised by a depletion timescale `t_dep`,
+    - spatial properties are set in co-ordinate system defined by a center and
+    rotation relative to datacube x-axis.
+
+    ...
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -39,39 +50,6 @@ class component(ABC):
                                optimize=True)
         self.xxp = xxyy_prime[:,:,0]
         self.yyp = xxyy_prime[:,:,1]
-
-
-
-class growingDisk(component):
-    """A growing disk with age-and-space dependent velocities and enrichments
-
-    The (mass-weighted) joint density of this component can be factorised as
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
-    where the factors are given by:
-    - p(t) : a beta distribution (see `set_p_t`)
-    - p(x|t) : cored power-law stratified on elliptical radius with age-varying
-    power law slope and x- and y- extents (see `set_p_x_t`)
-    - p(v|t,x) : Gaussians with age-and-space varying means and dispersions.
-    Means velocity maps resemble rotating disks (see `set_mu_v`) while
-    dispersions drop off as power-laws on elliptical radii (see `set_sig_v`)
-    - p(z|t,x) : chemical evolution model defined in equations 3-10 of
-    Zhu et al 2020, parameterised by a spatially varying depletion
-    timescale (see `set_p_z_tx`)
-
-    Args:
-        cube: a pkm.mock_cube.mockCube.
-        center (x0,y0): co-ordinates of the component center.
-        rotation: angle (degrees) between x-axes of component and cube.
-
-    """
-    def __init__(self,
-                 cube=None,
-                 center=(0,0),
-                 rotation=0.):
-        super(growingDisk, self).__init__(
-            cube=cube,
-            center=center,
-            rotation=rotation)
         self.get_z_interpolation_grid()
 
     def get_beta_a_b_from_lmd_phi(self, lmd, phi):
@@ -134,6 +112,142 @@ class growingDisk(component):
                            idx_start_end=idx_start_end,
                            dt=dt)
         self.p_t = p_t
+
+    def get_p_t(self, density=True, light_weighted=False):
+        """Get p(t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        if light_weighted is False:
+            p_t = self.p_t.copy()
+            if density is False:
+                p_t *= self.cube.ssps.delta_t
+        else:
+            p_tz = self.get_p_tz(density=False, light_weighted=True)
+            p_t = np.sum(p_tz, 1)
+            if density is True:
+                ssps = self.cube.ssps
+                p_t = p_t/ssps.delta_t
+        return p_t
+
+    def plot_sfh(self):
+        """Plot the star-foramtion history p(t)
+        """
+        ax = plt.gca()
+        ax.plot(self.cube.ssps.par_cents[1], self.p_t, '-o')
+        ax.set_xlabel('Time [Gyr]')
+        ax.set_ylabel('pdf')
+        plt.tight_layout()
+        plt.show()
+        return
+
+    def get_z_interpolation_grid(self,
+                                 t_dep_lim=(0.1, 10.),
+                                 n_t_dep=1000,
+                                 n_z=1000):
+        """Store a grid used for interpolating age-metallicity relations
+
+        Args:
+            t_dep_lim: (lo,hi) allowed values of depletion timescale in Gyr
+            n_t_dep (int): number of steps to use for interpolating t_dep
+            n_z (int): number of steps to use for interpolating metallicity
+
+        """
+
+        a = -0.689
+        b = 1.899
+        self.ahat = 10.**a
+        self.bhat = b-1.
+        z_max = self.ahat**(-1./self.bhat)
+        t_H = self.cube.ssps.par_edges[1][-1]
+        log_t_dep_lim = np.log10(t_dep_lim)
+        t_dep = np.logspace(*log_t_dep_lim, n_t_dep)
+        z_lim = (z_max, 0., n_z)
+        z = np.linspace(*z_lim, n_z)
+        tt_dep, zz = np.meshgrid(t_dep, z, indexing='ij')
+        t = t_H - tt_dep * zz/(1. - self.ahat * zz**self.bhat)
+        t_ssps = self.cube.ssps.par_cents[1]
+        n_t_ssps = len(t_ssps)
+        z_ssps = np.zeros((n_t_dep, n_t_ssps))
+        for i in range(n_t_dep):
+            z_ssps[i] = np.interp(t_ssps, t[i], z)
+        self.z_t_interp_grid = dict(t=t_ssps,
+                                    z=z_ssps,
+                                    t_dep=t_dep)
+
+    def evaluate_ybar(self):
+        """Evaluate the noise-free data-cube
+
+        Evaluate the integral
+        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
+        where
+        omega = ln(wavelength)
+        s(omega ; t,z) are stored SSP templates
+        This integral is a convolution over velocity v, which we evaluate using
+        Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
+        while FTs of the velocity factor P(v|t,x) of the density P(t,v,x,z)
+        are evaluated using the analytic expression of the FT of the normal
+        distribution. Sets the result to `self.ybar`.
+
+        """
+        cube = self.cube
+        ssps = cube.ssps
+        # get P(t,x,z)
+        P_txz = self.get_p_txz(density=False)
+        # get FT of P(v|t,x)
+        nl = ssps.FXw.shape[0]
+        omega = np.linspace(0, np.pi, nl)
+        omega /= ssps.dv
+        omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
+        exponent = -1j*self.mu_v*omega - 0.5*(self.sig_v*omega)**2
+        F_p_v_tx = np.exp(exponent)
+        # get FT of SSP templates s(w;t,z)
+        F_s_w_tz = ssps.FXw
+        F_s_w_tz = np.reshape(F_s_w_tz, (-1,)+ssps.par_dims)
+        # get FT of ybar
+        args = P_txz, F_p_v_tx, F_s_w_tz
+        F_ybar = np.einsum('txyz,wtxy,wzt->wxy', *args, optimize=True)
+        ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
+        self.ybar = ybar
+
+class growingDisk(component):
+    """A growing disk with age-and-space dependent velocities and enrichments
+
+    The (mass-weighted) joint density of this component can be factorised as
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
+    where the factors are given by:
+    - p(t) : a beta distribution (see `set_p_t`)
+    - p(x|t) : cored power-law stratified on elliptical radius with age-varying
+    power law slope and x- and y- extents (see `set_p_x_t`)
+    - p(v|t,x) : Gaussians with age-and-space varying means and dispersions.
+    Means velocity maps resemble rotating disks (see `set_mu_v`) while
+    dispersions drop off as power-laws on elliptical radii (see `set_sig_v`)
+    - p(z|t,x) : chemical evolution model defined in equations 3-10 of
+    Zhu et al 2020, parameterised by a spatially varying depletion
+    timescale (see `set_p_z_tx`)
+
+    Args:
+        cube: a pkm.mock_cube.mockCube.
+        center (x0,y0): co-ordinates of the component center.
+        rotation: angle (degrees) between x-axes of component and cube.
+
+    """
+    def __init__(self,
+                 cube=None,
+                 center=(0,0),
+                 rotation=0.):
+        super(growingDisk, self).__init__(
+            cube=cube,
+            center=center,
+            rotation=rotation)
 
     def linear_interpolate_t(self,
                              f_end,
@@ -201,40 +315,6 @@ class growingDisk(component):
         # rearrange shape from [t,x,y] to match function signature [x,y,t]
         rho = np.rollaxis(rho, 0, 3)
         self.p_x_t = rho
-
-    def get_z_interpolation_grid(self,
-                                 t_dep_lim=(0.1, 10.),
-                                 n_t_dep=1000,
-                                 n_z=1000):
-        """Store a grid which is used for interpolating metallicity vs time
-
-        Args:
-            t_dep_lim: (lo,hi) allowed values of depletion timescale in Gyr
-            n_t_dep (int): number of steps to use for interpolating t_dep
-            n_z (int): number of steps to use for interpolating metallicity
-
-        """
-
-        a = -0.689
-        b = 1.899
-        self.ahat = 10.**a
-        self.bhat = b-1.
-        z_max = self.ahat**(-1./self.bhat)
-        t_H = self.cube.ssps.par_edges[1][-1]
-        log_t_dep_lim = np.log10(t_dep_lim)
-        t_dep = np.logspace(*log_t_dep_lim, n_t_dep)
-        z_lim = (z_max, 0., n_z)
-        z = np.linspace(*z_lim, n_z)
-        tt_dep, zz = np.meshgrid(t_dep, z, indexing='ij')
-        t = t_H - tt_dep * zz/(1. - self.ahat * zz**self.bhat)
-        t_ssps = self.cube.ssps.par_cents[1]
-        n_t_ssps = len(t_ssps)
-        z_ssps = np.zeros((n_t_dep, n_t_ssps))
-        for i in range(n_t_dep):
-            z_ssps[i] = np.interp(t_ssps, t[i], z)
-        self.z_t_interp_grid = dict(t=t_ssps,
-                                    z=z_ssps,
-                                    t_dep=t_dep)
 
     def set_t_dep(self,
                   sig_x=0.5,
@@ -355,6 +435,11 @@ class growingDisk(component):
         sig_xp = self.linear_interpolate_t(*sig_x_lims)
         sig_yp = self.linear_interpolate_t(*sig_y_lims)
         rmax = self.linear_interpolate_t(*rmax_lims)
+        # next three lines calculate alpha_lims just to add to `self.mu_v_pars`
+        # to be able to compare `alpha_lims` with earlier implementations
+        rmax_lims = np.array(rmax_lims)
+        sig_x_lims = np.array(sig_x_lims)
+        alpha_lims = (rmax_lims/sig_x_lims+1.)/(rmax_lims/sig_x_lims)
         alpha = (rmax/sig_xp+1.)/(rmax/sig_xp)
         vmax = self.linear_interpolate_t(*vmax_lims)
         vinf = self.linear_interpolate_t(*vinf_lims)
@@ -381,7 +466,8 @@ class growingDisk(component):
                               sig_y_lims=sig_y_lims,
                               rmax_lims=rmax_lims,
                               vmax_lims=vmax_lims,
-                              vinf_lims=vinf_lims)
+                              vinf_lims=vinf_lims,
+                              alpha_lims=alpha_lims)
         self.mu_v = mu_v
 
     def set_sig_v(self,
@@ -442,31 +528,6 @@ class growingDisk(component):
                                sig_v_in_lims=sig_v_in_lims,
                                sig_v_out_lims=sig_v_out_lims)
         self.sig_v = sig
-
-    def get_p_t(self, density=True, light_weighted=False):
-        """Get p(t)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted is False:
-            p_t = self.p_t.copy()
-            if density is False:
-                p_t *= self.cube.ssps.delta_t
-        else:
-            p_tz = self.get_p_tz(density=density, light_weighted=True)
-            if density is True:
-                ssps = self.cube.ssps
-                p_tz = p_tz * ssps.delta_z
-            p_t = np.sum(p_tz, 1)
-        return p_t
 
     def get_p_x_t(self, density=True, light_weighted=False):
         """Get p(x|t)
@@ -895,52 +956,6 @@ class growingDisk(component):
         kurtosis_v_x = mu4_v_x/var_v_x**2.
         return kurtosis_v_x
 
-    def evaluate_ybar(self):
-        """Evaluate the noise-free data-cube
-
-        Evaluate the integral
-        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
-        where
-        omega = ln(wavelength)
-        s(omega ; t,z) are stored SSP templates
-        This integral is a convolution over velocity v, which we evaluate using
-        Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
-        while FTs of the velocity factor P(v|t,x) of the density P(t,v,x,z)
-        are evaluated using the analytic expression of the FT of the normal
-        distribution. Sets the result to `self.ybar`.
-
-        """
-        cube = self.cube
-        ssps = cube.ssps
-        # get P(t,x,z)
-        P_txz = self.get_p_txz(density=False)
-        # get FT of P(v|t,x)
-        nl = ssps.FXw.shape[0]
-        omega = np.linspace(0, np.pi, nl)
-        omega /= ssps.dv
-        omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
-        exponent = -1j*self.mu_v*omega - 0.5*(self.sig_v*omega)**2
-        F_p_v_tx = np.exp(exponent)
-        # get FT of SSP templates s(w;t,z)
-        F_s_w_tz = ssps.FXw
-        F_s_w_tz = np.reshape(F_s_w_tz, (-1,)+ssps.par_dims)
-        # get FT of ybar
-        args = P_txz, F_p_v_tx, F_s_w_tz
-        F_ybar = np.einsum('txyz,wtxy,wzt->wxy', *args, optimize=True)
-        ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
-        self.ybar = ybar
-
-    def plot_sfh(self):
-        """Plot the star-foramtion history p(t)
-        """
-        ax = plt.gca()
-        ax.plot(self.cube.ssps.par_cents[1], self.p_t, '-o')
-        ax.set_xlabel('Time [Gyr]')
-        ax.set_ylabel('pdf')
-        plt.tight_layout()
-        plt.show()
-        return
-
     def plot_density(self,
                      vmin=0.1,
                      vmax=3.,
@@ -1043,3 +1058,408 @@ class growingDisk(component):
             plt.gca().set_title(f't={t}')
             plt.tight_layout()
             plt.show()
+
+
+class stream(component):
+    """A stream with spatially varying kinematics but uniform enrichment.
+
+    The (mass-weighted) joint density of this component can be factorised as
+    p(t,x,v,z) = p(t) p(x) p(v|x) p(z|t)
+    where the factors are given by:
+    - p(t) : a beta distribution (see `set_p_t`),
+    - p(x) : a curved line with constant thickness (see `set_p_x`),
+    - p(v|x) : Guassian with mean varying along stream and constant sigma (see
+    set_p_v_x`),
+    - p(z|t) : single chemical evolution track i.. `t_dep` (see `set_p_z_t`).
+
+    Args:
+        cube: a pkm.mock_cube.mockCube.
+        center (x0,y0): co-ordinates of the component center.
+        rotation: angle (degrees) between x-axes of component and cube.
+        nsmp:
+
+    """
+    def __init__(self,
+                 cube=None,
+                 center=(0,0),
+                 rotation=0.):
+        super(stream, self).__init__(
+            cube=cube,
+            center=center,
+            rotation=rotation)
+
+    def set_p_x(self,
+                theta_lims=[0., np.pi/2.],
+                mu_r_lims=[0.7, 0.1],
+                sig=0.03,
+                nsmp=75):
+        """Define the stream track p(x)
+
+        Defined in polar co-ordinates (theta,r). Stream extends between angles
+        `theta_lims` between radii in `mu_r_lims`. Density is constant along
+        with varying theta. The track has a constant width on the sky, `sig`.
+
+        Args:
+            theta_lims: (start, end) values of stream angle in radians.
+            mu_r_lims: (start, end) values of stream distance from center.
+            sig (float): stream thickness.
+            nsmp (int): number of points to sample the angle theta.
+
+        Returns:
+            type: Description of returned object.
+
+        """
+        self.theta_lims = theta_lims
+        cube = self.cube
+        theta0, theta1 = theta_lims
+        self.nsmp = nsmp
+        theta_smp = np.linspace(theta0, theta1, self.nsmp)
+        mu_r0, mu_r1 = mu_r_lims
+        tmp = (theta_smp - theta0)/(theta1 - theta0)
+        mu_r_smp =  mu_r0 + (mu_r1 - mu_r0) * tmp
+        mu_x_smp = mu_r_smp * np.cos(theta_smp)
+        nrm_x = stats.norm(mu_x_smp, sig)
+        pdf_x = nrm_x.cdf(self.xxp[:,:,np.newaxis] + cube.dx/2.)
+        pdf_x -= nrm_x.cdf(self.xxp[:,:,np.newaxis] - cube.dx/2.)
+        mu_y_smp = mu_r_smp * np.sin(theta_smp)
+        nrm_y = stats.norm(mu_y_smp, sig)
+        pdf_y = nrm_y.cdf(self.yyp[:,:,np.newaxis] + cube.dy/2.)
+        pdf_y -= nrm_y.cdf(self.yyp[:,:,np.newaxis] - cube.dy/2.)
+        pdf = pdf_x * pdf_y
+        pdf = np.sum(pdf, -1)
+        pdf /= np.sum(pdf*cube.dx*cube.dy)
+        self.p_x_pars = dict(theta_lims=theta_lims,
+                             mu_r_lims=mu_r_lims,
+                             sig=sig,
+                             nsmp=nsmp)
+        self.p_x = pdf
+
+    def get_p_x(self, density=True, light_weighted=False):
+        """Get p(x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        # since x is indpt of (t,z), light- and mass- weight densities are equal
+        p_x = self.p_x.copy()
+        if density is False:
+            p_x *= (self.cube.dx * self.cube.dy)
+        return p_x
+
+    def get_p_x_t(self, density=True, light_weighted=False):
+        """Get p(x|t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_x = self.get_p_x(density=density, light_weighted=light_weighted)
+        # since x is indpt of t, p(x|t)=p(x)
+        nt = self.cube.ssps.par_dims[1]
+        p_x_t = np.broadcast_to(p_x[:,:,np.newaxis], p_x.shape+(nt,))
+        return p_x_t
+
+    def get_p_tx(self, density=True, light_weighted=False):
+        """Get p(t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_x = self.get_p_x(density=density, light_weighted=light_weighted)
+        p_t = self.get_p_t(density=density, light_weighted=light_weighted)
+        # since x and t are independent p(t,x)=p(x)p(t)
+        na = np.newaxis
+        p_tx = p_t[:,na,na]*p_x[na,:,:]
+        return p_tx
+
+    def set_p_z_t(self, t_dep=3.):
+        assert (t_dep > 0.1) and (t_dep < 10.0)
+        self.t_dep = t_dep
+        del_t_dep = self.t_dep - self.z_t_interp_grid['t_dep']
+        abs_del_t_dep = np.abs(del_t_dep)
+        idx_t_dep = np.argmin(abs_del_t_dep, axis=-1)
+        self.idx_t_dep = idx_t_dep
+        idx_t_dep = np.ravel(idx_t_dep)
+        z_mu = self.z_t_interp_grid['z'][idx_t_dep]
+        z_mu = np.squeeze(z_mu)
+        self.z_mu = z_mu
+        z_sig2 = self.ahat * z_mu**self.bhat
+        log_z_edg = self.cube.ssps.par_edges[0]
+        del_log_z = log_z_edg[1:] - log_z_edg[:-1]
+        x_xsun = 1. # i.e. assuming galaxy has hydrogen mass fraction = solar
+        lin_z_edg = 10.**log_z_edg * x_xsun
+        nrm = stats.norm(loc=z_mu, scale=z_sig2**0.5)
+        lin_z_edg = lin_z_edg[:, np.newaxis]
+        cdf_z_tx = nrm.cdf(lin_z_edg)
+        p_z_t = cdf_z_tx[1:] - cdf_z_tx[:-1]
+        p_z_t /= np.sum(p_z_t, 0)
+        p_z_t /= del_log_z[:, np.newaxis]
+        self.p_z_t_pars = dict(t_dep=t_dep)
+        self.p_z_t = p_z_t
+
+    def get_p_z_t(self, density=True, light_weighted=False):
+        """Get p(z|t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        if light_weighted is False:
+            p_z_t = self.p_z_t.copy()
+            if density is False:
+                dz = self.cube.ssps.delta_z
+                dz = dz[:, np.newaxis]
+                p_z_t *= dz
+        else:
+            p_tz = self.get_p_tz(density=False, light_weighted=True)
+            p_t = self.get_p_t(density=False, light_weighted=True)
+            p_z_t = p_tz.T/p_t
+            if density:
+                dz = self.cube.ssps.delta_z
+                dz = dz[:, np.newaxis]
+                p_z_t /= dz
+        return p_z_t
+
+    def get_p_tz(self, density=True, light_weighted=False):
+        """Get p(t,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_z_t = self.get_p_z_t(density=density, light_weighted=False)
+        p_t = self.get_p_t(density=density, light_weighted=False)
+        p_zt = p_z_t*p_t
+        p_tz = p_zt.T
+        if light_weighted:
+            light_weights = self.cube.ssps.light_weights
+            normalisation = np.sum(p_tz*light_weights)
+            p_tz = p_tz*light_weights/normalisation
+            if density:
+                dt = self.cube.ssps.delta_t
+                dz = self.cube.ssps.delta_z
+                dtdz = dt[:,np.newaxis] * dz[np.newaxis,:]
+                p_tz /= dtdz
+        return p_tz
+
+    def get_p_z(self, density=True, light_weighted=False):
+        """Get p(z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tz = self.get_p_tz(density=False, light_weighted=light_weighted)
+        p_z = np.sum(p_tz, 0)
+        if density is True:
+            dz = self.cube.ssps.delta_z
+            p_z /= dz
+        return p_z
+
+    def get_p_z_tx(self, density=True, light_weighted=False):
+        """Get p(z|t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_z_t = self.get_p_z_t(density=density, light_weighted=light_weighted)
+        p_z_tx = p_z_t[:,:,np.newaxis,np.newaxis]
+        cube_shape = (self.cube.nx, self.cube.ny)
+        p_z_tx = np.broadcast_to(p_z_tx, p_z_t.shape+cube_shape)
+        return p_z_tx
+
+    def get_p_txz(self, density=True, light_weighted=False):
+        """Get p(t,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tz = self.get_p_tz(density=density, light_weighted=light_weighted)
+        p_x = self.get_p_x(density=density, light_weighted=light_weighted)
+        na = np.newaxis
+        p_txz = p_tz[:,na,na,:] * p_x[na,:,:,na]
+        return p_txz
+
+    def get_p_tz_x(self, density=True, light_weighted=False):
+        """Get p(t,z|x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tz = self.get_p_tz(density=density, light_weighted=light_weighted)
+        na = np.newaxis
+        cube_shape = (self.cube.nx, self.cube.ny)
+        p_tz_x = np.broadcast_to(p_tz[:,:,na,na], p_tz.shape+cube_shape)
+        return p_tz_x
+
+    def set_p_v_x(self,
+                  mu_v_lims=[-100,100],
+                  sig_v=100.):
+        """Set parameters for p(v|x)
+
+        p(v|x) = N(mu_v(x), sig) where mu_v(x) is linearly interpolated with
+        angle theta, between start/end values specified in `mu_v_lims`
+
+        Args:
+            mu_v_lims: (start, end) values of stream velocity
+            sig_v (float): constant std dev of velocity distribution
+
+        """
+        th = np.arctan2(self.yyp, self.xxp)
+        mu_v = np.zeros_like(th)
+        mu_v_lo, mu_v_hi = mu_v_lims
+        min_th, max_th = np.min(self.theta_lims), np.max(self.theta_lims)
+        idx = np.where(th <= min_th)
+        mu_v[idx] = mu_v_lo
+        idx = np.where(th >= max_th)
+        mu_v[idx] = mu_v_hi
+        idx = np.where((th > min_th) & (th < max_th))
+        mu_v[idx] = (th[idx]-min_th)/(max_th-min_th) * (mu_v_hi-mu_v_lo)
+        mu_v[idx] += mu_v_lo
+        self.p_v_x_pars = dict(mu_v_lims=mu_v_lims, sig_v=sig_v)
+        self.mu_v = mu_v
+        self.sig_v = np.zeros_like(mu_v) + sig_v
+
+    def get_p_v_x(self, v_edg, density=True, light_weighted=False):
+        """Get p(v|x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        norm = stats.norm(loc=self.mu_v, scale=self.sig_v)
+        v = (v_edg[:-1] + v_edg[1:])/2.
+        v = v[:, np.newaxis, np.newaxis]
+        p_v_x = norm.pdf(v)
+        if density is False:
+            dv = v_edg[1:] - v_edg[:-1]
+            dv = dv[:, np.newaxis, np.newaxis]
+            p_v_x *= dv
+        return p_v_x
+
+    def get_p_v(self, v_edg, density=True, light_weighted=False):
+        """Get p(v)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_v_x = self.get_p_v_x(v_edg, density=density)
+        P_x = self.get_p_x(density=False)
+        p_v = np.sum(p_v_x*P_x, (1,2))
+        return p_v
+
+    def get_p_v_tx(self, v_edg, density=True, light_weighted=False):
+        """Get p(v|t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_v_x = self.get_p_v_x(v_edg, density=density)
+        nt = self.cube.ssps.par_dims[1]
+        shape = p_v_x.shape
+        shape = (shape[0], nt, shape[1], shape[2])
+        p_v_tx = np.broadcast_to(p_v_x[:,np.newaxis,:,:], shape)
+        return p_v_tx
+
+    def get_p_tvxz(self, v_edg, density=True, light_weighted=False):
+        """Get p(v,t,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tz = self.get_p_tz(density=density, light_weighted=light_weighted)
+        p_v_x = self.get_p_v_x(v_edg, density=density)
+        p_x = self.get_p_x(density=density)
+        na = np.newaxis
+        p_vx = p_v_x * p_x[na,:,:]
+        p_tvxz = p_tz[:,na,na,na,:] * p_vx[na,:,:,:,na]
+        return p_tvxz
+
+
+# end
