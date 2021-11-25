@@ -72,6 +72,7 @@ class IFUCube(object):
 
         """
         nrm = stats.norm(0.*self.ybar, self.ybar/snr)
+        self.snr = snr
         self.noise = nrm.rvs()
         self.yobs = self.ybar + self.noise
 
