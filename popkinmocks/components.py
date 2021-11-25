@@ -435,6 +435,11 @@ class growingDisk(component):
         sig_xp = self.linear_interpolate_t(*sig_x_lims)
         sig_yp = self.linear_interpolate_t(*sig_y_lims)
         rmax = self.linear_interpolate_t(*rmax_lims)
+        # next three lines calculate alpha_lims just to add to `self.mu_v_pars`
+        # to be able to compare `alpha_lims` with earlier implementations
+        rmax_lims = np.array(rmax_lims)
+        sig_x_lims = np.array(rmax_lims)
+        alpha_lims = (rmax_lims/sig_x_lims+1.)/(rmax_lims/sig_x_lims)
         alpha = (rmax/sig_xp+1.)/(rmax/sig_xp)
         vmax = self.linear_interpolate_t(*vmax_lims)
         vinf = self.linear_interpolate_t(*vinf_lims)
@@ -462,7 +467,7 @@ class growingDisk(component):
                               rmax_lims=rmax_lims,
                               vmax_lims=vmax_lims,
                               vinf_lims=vinf_lims,
-                              alpha=alpha)
+                              alpha_lims=alpha_lims)
         self.mu_v = mu_v
 
     def set_sig_v(self,
