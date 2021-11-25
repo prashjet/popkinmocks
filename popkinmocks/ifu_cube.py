@@ -100,8 +100,11 @@ class IFUCube(object):
         if v_edg is None:
             v_edg = np.arange(-1000, 1001, self.ssps.dv)
         u_edg = np.log(1. + v_edg/self.ssps.speed_of_light)
-        p_tvxz = self.get_p('tvxz', v_edg, density=True, collapse_cmps=True)
-        f_xvtz = np.moveaxis(p_tvxz, [0,1,2,3,4], [3,2,0,1,4])
+        p_tvxz = self.get_p('tvxz',
+                            collapse_cmps=True,
+                            density=True,
+                            v_edg=v_edg)
+        f_xvzt = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
         np.savez(direc + fname,
                  nx1=self.nx,
                  nx2=self.ny,
@@ -114,7 +117,7 @@ class IFUCube(object):
                  ybar=self.ybar,
                  y=self.yobs,
                  v_edg=v_edg,
-                 f_xvtz=f_xvtz)
+                 f_xvzt=f_xvzt)
 
     def get_p(self,
               which_dist,
