@@ -104,7 +104,7 @@ class IFUCube(object):
                             collapse_cmps=True,
                             density=True,
                             v_edg=v_edg)
-        f_xvzt = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
+        f_xvtz = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
         np.savez(direc + fname,
                  nx1=self.nx,
                  nx2=self.ny,
@@ -117,7 +117,7 @@ class IFUCube(object):
                  ybar=self.ybar,
                  y=self.yobs,
                  v_edg=v_edg,
-                 f_xvzt=f_xvzt)
+                 f_xvtz=f_xvtz)
 
     def get_p(self,
               which_dist,
