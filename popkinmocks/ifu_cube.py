@@ -276,13 +276,12 @@ class IFUCube(object):
             **kw_imshow (dict): extra keyword parameters passed to `plt.imshow`
 
         Returns:
-            ax: a `matplotlib` `axis` object
+            a `matplotlib` `AxesImage` object
 
         """
         img = np.flipud(img.T)
         kw_imshow0 = {'extent':self.xrng + self.yrng}
         kw_imshow0.update(kw_imshow)
-        print(kw_imshow0)
         if ax is None:
             ax = plt.gca()
         img = ax.imshow(img, **kw_imshow0)
@@ -295,4 +294,4 @@ class IFUCube(object):
         else:
             ax.set_xlabel('$x_1$')
             ax.set_ylabel('$x_2$')
-        return ax
+        return img
