@@ -978,8 +978,8 @@ class growingDisk(component):
                      'norm':LogNorm(vmin=vmin, vmax=vmax)}
         for t_idx in t_idx_list:
             t = self.cube.ssps.par_cents[1][t_idx]
-            ax = self.cube.imshow(self.p_x_t[:,:,t_idx], **kw_imshow)
-            ax.set_title(f't={t}')
+            img = self.cube.imshow(self.p_x_t[:,:,t_idx], **kw_imshow)
+            plt.gca().set_title(f't={t}')
             plt.tight_layout()
             plt.show()
         return
@@ -988,7 +988,7 @@ class growingDisk(component):
         """Plot map of depletion timescale used for chemical enrichment
         """
         kw_imshow = {'cmap':plt.cm.jet}
-        ax = self.cube.imshow(self.t_dep,
+        img = self.cube.imshow(self.t_dep,
                               colorbar_label='$t_\mathrm{dep}$',
                               **kw_imshow)
         plt.tight_layout()
