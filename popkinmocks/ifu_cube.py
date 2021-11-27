@@ -122,8 +122,9 @@ class IFUCube(object):
     def get_p(self,
               which_dist,
               collapse_cmps=False,
-              *args,
-              **kwargs):
+              density=True,
+              light_weighted=False,
+              v_edg=None):
         """Evaluate densities of the galaxy
 
         5D densities over: stellar age (t), 2D position (x), velocity (v), and
@@ -175,16 +176,134 @@ class IFUCube(object):
                               'tvxz',
                               'v_x',
                               'v']
+        if light_weighted is False:
+            count = 0
+            for i, (cmp, w) in enumerate(zip(self.component_list,self.weights)):
+                p_func = getattr(cmp, 'get_p_'+which_dist)
+                if 'v' in which_dist:
+                    pi = w * p_func(v_edg=v_edg,
+                                    density=density,
+                                    light_weighted=False)
+                else:
+                    pi = w * p_func(density=density, light_weighted=False)
+                if count == 0:
+                    p = np.zeros((self.n_cmps,) + pi.shape)
+                p[i] = pi
+                count += 1
+        else:
+            p = self.get_light_weighted_distributions(
+                which_dist,
+                density=density,
+                light_weighted=light_weighted,
+                v_edg=v_edg)
+        if collapse_cmps:
+            p = np.sum(p, 0)
+        return p
+
+    def get_light_weighted_distributions(self,
+                                         which_dist,
+                                         density=True,
+                                         light_weighted=False,
+                                         v_edg=None):
+        dt = self.ssps.delta_t
+        dz = self.ssps.delta_z
+        if v_edg is not None:
+            dv = v_edg[1:] - v_edg[:-1]
+        dx2 = self.dx*self.dy
+        na = np.newaxis
         count = 0
-        for i, (cmp, w) in enumerate(zip(self.component_list, self.weights)):
-            p_func = getattr(cmp, 'get_p_'+which_dist)
-            pi = w * p_func(*args, **kwargs)
-            if count==0:
+        # evaluate mass-weighted probabilties over all (t,x,z) or (t,v,x,z) if
+        # v is in the target distribution
+        for i, (cmp, w) in enumerate(zip(self.component_list,self.weights)):
+            if 'v' in which_dist:
+                pi = w * cmp.get_p_tvxz(v_edg=v_edg,
+                                        density=False,
+                                        light_weighted=False)
+            else:
+                pi = w * cmp.get_p_txz(density=False, light_weighted=False)
+            if count == 0:
                 p = np.zeros((self.n_cmps,) + pi.shape)
             p[i] = pi
             count += 1
-        if collapse_cmps:
-            p = np.sum(p, 0)
+        # apply light-weighting
+        if 'v' in which_dist:
+            p *= self.ssps.light_weights[na,:,na,na,na,:]
+        else:
+            p *= self.ssps.light_weights[na,:,na,na,:]
+        p /= np.sum(p)
+        # at this point p = light-weighted P(i,t,v,x,z) / P(i,t,x,z) ...
+        # ... if v is / isn't in `which_dist` (and i indexes over components)
+        # now evaluate the desired marginal/conditional
+        if which_dist=='t':
+            p = np.sum(p, (2,3,4))
+            if density:
+                p /= dt[na,:]
+        elif which_dist=='x_t':
+            p_tx = np.sum(p, 4)
+            p_xt = np.moveaxis(p_tx, 1, -1)
+            p_t = np.sum(p, (0,2,3,4))      # this must be mrg. over i
+            p = p_xt/p_t[na,na,na,:]
+            if density:
+                p /= dx2
+        elif which_dist=='tx':
+            p = np.sum(p, 4)
+            if density:
+                p /= dx2*dt[na,:,na,na]
+        elif which_dist=='z_tx':
+            p_tx = np.sum(p, (0,4))
+            p_ztx = np.moveaxis(p, -1, 1)
+            p = p_ztx/p_tx[na,na,:,:,:]
+            if density:
+                p /= dz[na,:,na,na,na]
+        elif which_dist=='txz':
+            pass
+            if density:
+                dvol = dt[:,na,na,na]*dx2*dz[na,na,na,:]
+                p /= dvol
+        elif which_dist=='x':
+            p = np.sum(p, (1,4))
+            if density:
+                p /= dx2
+        elif which_dist=='z':
+            p = np.sum(p, (1,2,3))
+            if density:
+                p /= dz
+        elif which_dist=='tz_x':
+            p_tzx = np.moveaxis(p, -1, 2)
+            p_x = np.sum(p, (0,1,4))
+            p = p_tzx/p_x
+            if density:
+                dvol = dt[na,:,na,na,na] * dz[na,na,:,na,na]
+                p /= dvol
+        elif which_dist=='tz':
+            p = np.sum(p, (2,3))
+            if density:
+                dvol = dt[na,:,na]*dz[na,na,:]
+                p /= dvol
+        elif which_dist=='v_tx':
+            p_tvx = np.sum(p, -1)
+            p_vtx = np.moveaxis(p_tvx, 2, 1)
+            p_tx = np.sum(p, (0,2,-1))
+            p = p_vtx/p_tx[na,na,:,:,:]
+            if density:
+                p /= dv[na,:,na,na,na]
+        elif which_dist=='tvxz':
+            pass
+            if density:
+                dvol = dt[:,na,na,na,na]*dv[na,:,na,na,na]*dx2*dz[na,na,na,na,:]
+                p = p/dvol
+        elif which_dist=='v_x':
+            p_vx = np.sum(p, (1,5))
+            p_x = np.sum(p, (0,1,2,5))
+            p = p_vx/p_x[na,na,:,:]
+            if density:
+                p /= dv[na,:,na,na]
+        elif which_dist=='v':
+            p = np.sum(p, (1,3,4,5))
+            if density:
+                p /= dv[na,:]
+        else:
+            raise ValueErrror('Unknown value of which_dist')
         return p
 
     def get_E_v_x(self):
