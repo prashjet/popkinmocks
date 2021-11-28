@@ -1264,14 +1264,10 @@ class stream(component):
         p_zt = p_z_t*p_t
         p_tz = p_zt.T
         if light_weighted:
-            light_weights = self.cube.ssps.light_weights
-            normalisation = np.sum(p_tz*light_weights)
-            p_tz = p_tz*light_weights/normalisation
-            if density:
-                dt = self.cube.ssps.delta_t
-                dz = self.cube.ssps.delta_z
-                dtdz = dt[:,np.newaxis] * dz[np.newaxis,:]
-                p_tz /= dtdz
+            ssps = self.cube.ssps
+            P_tz_mass_wtd = self.get_p_tz(density=False)
+            normalisation = np.sum(P_tz_mass_wtd*ssps.light_weights)
+            p_tz = p_tz*ssps.light_weights/normalisation
         return p_tz
 
     def get_p_z(self, density=True, light_weighted=False):

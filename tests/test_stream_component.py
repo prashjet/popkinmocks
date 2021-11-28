@@ -3,27 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import popkinmocks as pkm
 
-
 @pytest.fixture
-def my_component():
-    ssps = pkm.model_grids.milesSSPs()
-    ssps.logarithmically_resample(dv=100.)
-    ssps.calculate_fourier_transform()
-    ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
-    stream = pkm.components.stream(cube=cube, rotation=0., center=(0.,0))
-    stream.set_p_t(lmd=15., phi=0.3)
-    stream.set_p_x(theta_lims=[-np.pi/2., 2.5*np.pi],
-                   mu_r_lims=[0.2,0.8],
-                   nsmp=1000,
-                   sig=0.1)
-    stream.set_p_z_t(t_dep=5.)
-    stream.set_p_v_x(mu_v_lims=[-100,100], sig_v=110.)
-    stream.evaluate_ybar()
-    return ssps, cube, stream
-
-@pytest.fixture
-def my_ybar_trim():
+def my_stream_ybar_trim():
     ybar_trim = np.array([[
         [3.03578561e-19, 1.21683510e-12, 1.48492461e-10, 7.22051417e-12,
          1.69923785e-17],
@@ -101,14 +82,13 @@ def my_ybar_trim():
          4.80982656e-07],
         [2.27580807e-16, 3.64691199e-10, 4.28295437e-08, 2.54728420e-08,
          5.13802296e-11]]])
-
     return ybar_trim
 
-def test_component_normalisation(my_component):
+def test_component_normalisation(my_stream_component):
     """Tests the normalisations of all densities evaluated for a component
 
     """
-    ssps, cube, stream = my_component
+    ssps, cube, stream = my_stream_component
     v_edg = np.linspace(-900, 900, 20)
     dv = v_edg[1] - v_edg[0]
     na = np.newaxis
@@ -248,15 +228,15 @@ def test_component_normalisation(my_component):
     assert np.isclose(np.sum(a*vol_elmt), 1)
 
 def test_component_ybar(
-    my_component,
-    my_ybar_trim,
+    my_stream_component,
+    my_stream_ybar_trim,
     ):
     """Checks value of ybar for one component
 
     """
-    ssps, cube, stream = my_component
+    ssps, cube, stream = my_stream_component
     ybar_trim = stream.ybar[::150, ::2, ::2]
-    assert np.allclose(ybar_trim, my_ybar_trim)
+    assert np.allclose(ybar_trim, my_stream_ybar_trim)
 
 
 
