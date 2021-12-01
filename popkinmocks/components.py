@@ -21,8 +21,7 @@ class component(ABC):
     of Zhu et al 2020, parameterised by a depletion timescale `t_dep`,
     - spatial properties are set in co-ordinate system defined by a center and
     rotation relative to datacube x-axis.
-
-    ...
+    - the `get_p_vx` method, since generically p(v,x) = p(v|x)p(x)
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -217,6 +216,27 @@ class component(ABC):
         F_ybar = np.einsum('txyz,wtxy,wzt->wxy', *args, optimize=True)
         ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
         self.ybar = ybar
+
+    def get_p_vx(self, v_edg, density=True, light_weighted=False):
+        """Get p(v,x)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_v_x = self.get_p_v_x(v_edg,
+                               density=density,
+                               light_weighted=light_weighted)
+        p_x = self.get_p_x(density=density, light_weighted=light_weighted)
+        p_vx = p_v_x*p_x
+        return p_vx
 
 class growingDisk(component):
     """A growing disk with age-and-space dependent velocities and enrichments
