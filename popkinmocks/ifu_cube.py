@@ -131,17 +131,17 @@ class IFUCube(object):
         metallicity (z). Which density to evaluate is specificed by `which_dist`
         which can be one of:
         - 't'
-        - 'x_t',
+        - 'x_t'
         - 'tx'
-        - 'z_tx',
-        - 'txz',
-        - 'x',
-        - 'z',
-        - 'tz_x',
-        - 'tz',
-        - 'v_tx',
+        - 'z_tx'
+        - 'txz'
+        - 'x'
+        - 'z'
+        - 'tz_x'
+        - 'tz'
         - 'tvxz'
-        - 'v_x',
+        - 'vx'
+        - 'v_x'
         - 'v'
         where the underscore (if-present) represents conditioning i.e. calling
         `get_p('tz_x')` will return p(t,z|x). This calls the `get_p...` methods
@@ -150,17 +150,19 @@ class IFUCube(object):
         Args:
             which_dist (string): which density to evaluate
             collapse_cmps (bool): whether to collapse component densities
-            together (True) or leave them in-tact (False)
-            *args : extra arguments passed to component 'get_p...' method,
-            typically a velocity bin-edge array
-            **kwargs (type): extra keyword arguments passed to component
-            'get_p...' method, typically booleans `density`, or `light_weighted`
+                together (True) or leave them in-tact (False)
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+            v_edg (array): array of velocity-bin edges
 
         Returns:
-            array: the desired density. If `collapse_cmps=True`, then array
-            dimensions correspond to the order they are labelled in `which_dist`
-            string (with 2 for 2D posiion x). If `collapse_cmps=False` the first
-            array dimension represents different components.
+            array: the desired distribution. If `collapse_cmps=True`, then array
+                dimensions correspond to the order they are labelled in
+                `which_dist` string (with 2 for 2D posiion x). If
+                `collapse_cmps=False` the first array dimension represents
+                different components.
 
         """
         assert which_dist in ['t',
@@ -172,39 +174,153 @@ class IFUCube(object):
                               'z',
                               'tz_x',
                               'tz',
-                              'v_tx',
                               'tvxz',
+                              'vx',
                               'v_x',
                               'v']
+        is_conditional = '_' in which_dist
         if light_weighted is False:
-            count = 0
-            for i, (cmp, w) in enumerate(zip(self.component_list,self.weights)):
-                p_func = getattr(cmp, 'get_p_'+which_dist)
-                if 'v' in which_dist:
-                    pi = w * p_func(v_edg=v_edg,
-                                    density=density,
-                                    light_weighted=False)
-                else:
-                    pi = w * p_func(density=density, light_weighted=False)
-                if count == 0:
-                    p = np.zeros((self.n_cmps,) + pi.shape)
-                p[i] = pi
-                count += 1
+            if is_conditional:
+                p = self.get_conditional_mass_weighted_distributions(
+                    which_dist,
+                    density=density,
+                    v_edg=v_edg)
+            else:
+                count = 0
+                for i, (cmp, w) in enumerate(zip(self.component_list,self.weights)):
+                    p_func = getattr(cmp, 'get_p_'+which_dist)
+                    if 'v' in which_dist:
+                        pi = w * p_func(v_edg=v_edg,
+                                        density=density,
+                                        light_weighted=False)
+                    else:
+                        pi = w * p_func(density=density, light_weighted=False)
+                    if count == 0:
+                        p = np.zeros((self.n_cmps,) + pi.shape)
+                    p[i] = pi
+                    count += 1
         else:
             p = self.get_light_weighted_distributions(
                 which_dist,
                 density=density,
-                light_weighted=light_weighted,
                 v_edg=v_edg)
         if collapse_cmps:
             p = np.sum(p, 0)
         return p
 
+    def get_conditional_mass_weighted_distributions(self,
+                                                    which_dist,
+                                                    density=True,
+                                                    v_edg=None):
+        """Get conditional distributions
+
+        This is intended to be called only by the `get_p` wrapper method - see
+        that docstring for more info.
+
+        Args:
+            which_dist (string): which density to evaluate
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            v_edg (array): array of velocity-bin edges
+
+        Returns:
+            array: the desired distribution.
+
+        """
+        assert '_' in which_dist
+        dist, marginal = which_dist.split('_')
+         # get an alphatized string for the joint distribution
+        joint = ''.join(sorted(dist+marginal))
+        p_joint = self.get_p(joint, density=False, v_edg=v_edg, collapse_cmps=False)
+        p_marginal = self.get_p(marginal, density=False, v_edg=v_edg, collapse_cmps=True)
+        # if x is in joint/marginalal, repalace it with xy to account for the
+        # fact that x stands for 2D positon (x,y)
+        joint = joint.replace('x', 'xy')
+        marginal = marginal.replace('x', 'xy')
+        # first dimension in the joint corresponts to component index:
+        joint = 'i' + joint
+        # for each entry in the marginal, find its position in the joint
+        old_pos_in_joint = [joint.find(m0) for m0 in marginal]
+        # move the marginal variables to the far right of the joint
+        n_marginal = len(marginal)
+        new_pos_in_joint = [-(i+1) for i in range(n_marginal)][::-1]
+        p_joint = np.moveaxis(p_joint, old_pos_in_joint, new_pos_in_joint)
+        # get the conditional probability
+        p_conditional = p_joint/p_marginal
+        if density:
+            dvol = self.construct_volume_element(which_dist, v_edg=v_edg)
+            p_conditional = p_conditional/dvol
+        return p_conditional
+
+    def construct_volume_element(self,
+                                 which_dist,
+                                 collapse_cmps=True,
+                                 v_edg=None):
+        """Construct volume element for converting densities to probabilties
+
+        Args:
+            which_dist (string): which density to evaluate
+            collapse_cmps (bool): whether to collapse component densities
+                together (True) or leave them in-tact (False)
+            v_edg (array): array of velocity-bin edges
+
+        Returns:
+            array: The volume element with correct shape for `which_dist`
+
+        """
+        dist_string, marginal_string = which_dist.split('_')
+        dist_string = dist_string.replace('x', 'xy')
+        marginal_string = marginal_string.replace('x', 'xy')
+        if collapse_cmps is True:
+            count = 0
+            ndim = len(dist_string)
+        else:
+            # first dimension is discrete indicator over components
+            count = 1
+            ndim = len(dist_string) + 1
+        dvol = np.ones([1 for i in range(ndim)])
+        na = np.newaxis
+        slc = slice(0,None)
+        for var in dist_string:
+            if var=='t':
+                da = self.ssps.delta_t
+            elif var=='v':
+                da = v_edg[1:] - v_edg[:-1]
+            elif var=='x':
+                da = np.array([self.dx])
+            elif var=='y':
+                da = np.array([self.dy])
+            elif var=='z':
+                da = self.ssps.delta_z
+            idx = tuple([na for i in range(count)])
+            idx = idx + (slc,)
+            idx = idx + tuple([na for i in range(ndim-count-1)])
+            dvol = dvol * da[idx]
+            count += 1
+        idx = tuple([slc for i in range(dvol.ndim)])
+        idx = idx + tuple([na for i in range(len(marginal_string))])
+        dvol = dvol[idx]
+        return dvol
+
     def get_light_weighted_distributions(self,
                                          which_dist,
                                          density=True,
-                                         light_weighted=False,
                                          v_edg=None):
+        """Get light-weighted distributions
+
+        This is intended to be called only by the `get_p` wrapper method - see
+        that docstring for more info.
+
+        Args:
+            which_dist (string): which density to evaluate
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            v_edg (array): array of velocity-bin edges
+
+        Returns:
+            array: the desired distribution.
+
+        """
         dt = self.ssps.delta_t
         dz = self.ssps.delta_z
         if v_edg is not None:
@@ -280,18 +396,15 @@ class IFUCube(object):
             if density:
                 dvol = dt[na,:,na]*dz[na,na,:]
                 p /= dvol
-        elif which_dist=='v_tx':
-            p_tvx = np.sum(p, -1)
-            p_vtx = np.moveaxis(p_tvx, 2, 1)
-            p_tx = np.sum(p, (0,2,-1))
-            p = p_vtx/p_tx[na,na,:,:,:]
-            if density:
-                p /= dv[na,:,na,na,na]
         elif which_dist=='tvxz':
             pass
             if density:
                 dvol = dt[:,na,na,na,na]*dv[na,:,na,na,na]*dx2*dz[na,na,na,na,:]
                 p = p/dvol
+        elif which_dist=='vx':
+            p = np.sum(p, (1,5))
+            if density:
+                p /= (dx2*dv[:,na,na])
         elif which_dist=='v_x':
             p_vx = np.sum(p, (1,5))
             p_x = np.sum(p, (0,1,2,5))
