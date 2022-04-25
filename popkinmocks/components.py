@@ -1013,7 +1013,7 @@ class growingDisk(component):
                               **kw_imshow)
         plt.tight_layout()
         plt.show()
-        return ax
+        return
 
     def plot_mu_v(self,
                   show_every_nth_time=4,

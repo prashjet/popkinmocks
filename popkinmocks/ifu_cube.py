@@ -63,9 +63,9 @@ class IFUCube(object):
         self.ybar = ybar
 
     def add_noise(self, snr=100.):
-        """Add noise to signal `ybar` to give observed `yobs` for desired SNR
+        """Add noise with SNR which is consant with position and wavelength
 
-        SNR = standard deviation of `ybar/yobs`
+        yobs ~ Norm(ybar, ybar/snr)
 
         Args:
             snr : the desired signal-to-noise ratio
@@ -73,6 +73,20 @@ class IFUCube(object):
         """
         nrm = stats.norm(0.*self.ybar, self.ybar/snr)
         self.snr = snr
+        self.noise = nrm.rvs()
+        self.yobs = self.ybar + self.noise
+
+    def add_sqrt_signal_noise(self, noise_constant=1.):
+        """Add noise which scales by sqrt of the signal
+
+        yobs ~ Norm(ybar, noise_constant*sqrt(ybar))
+
+        Args:
+            noise_constant : scaing constant for the noise
+
+        """
+        nrm = stats.norm(0, self.noise_constant*self.ybar**0.5)
+        self.noise_constant = noise_constant
         self.noise = nrm.rvs()
         self.yobs = self.ybar + self.noise
 
