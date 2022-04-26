@@ -5,5 +5,3 @@
 
 Create mock IFU datacubes for stellar population and kinematic modelling.
 See the Jupyter notebook `notebooks/popkinmocks.ipynb` for an example.
-
-The script to generate the mock datacube used in the PNKR paper can be found in `scripts/pnkr_mockcube.py`.
