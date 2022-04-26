@@ -166,6 +166,8 @@ class component(ABC):
         self.ahat = 10.**a
         self.bhat = b-1.
         z_max = self.ahat**(-1./self.bhat)
+        # reduce z_max slightly to avoid divide by 0 warnings
+        z_max *= 0.9999
         t_H = self.cube.ssps.par_edges[1][-1]
         log_t_dep_lim = np.log10(t_dep_lim)
         t_dep = np.logspace(*log_t_dep_lim, n_t_dep)
@@ -173,6 +175,7 @@ class component(ABC):
         z = np.linspace(*z_lim, n_z)
         tt_dep, zz = np.meshgrid(t_dep, z, indexing='ij')
         t = t_H - tt_dep * zz/(1. - self.ahat * zz**self.bhat)
+        self.t = t
         t_ssps = self.cube.ssps.par_cents[1]
         n_t_ssps = len(t_ssps)
         z_ssps = np.zeros((n_t_dep, n_t_ssps))
@@ -292,86 +295,82 @@ class growingDisk(component):
         return f
 
     def set_p_x_t(self,
-                  sig_x_lims=(0.5, 0.5),
-                  sig_y_lims=(0.5, 0.1),
+                  q_lims=(0.5, 0.1),
+                  rc_lims=(0.5, 0.1),
                   alpha_lims=(0.5, 2.)):
         """Set the density p(x|t) as cored power-law in elliptical radius
 
         Desnities are cored power-laws stratified on elliptical radius r,
-        r^2 = (x/sig_x)^2 + (y/sig_y)^2
-        p(x|t) = (r+1)^-alpha
+        r^2 = x^2 + (y/q)^2
+        p(x|t) = (r+rc)^-alpha
         where the disk sizes and slopes
         sig_x(t), sig_y(t), alpha(t)
         vary linearly with time between their specified (end, start) values.
 
         Args:
-            sig_x_lims: (end,start) value of disk-size in x-direction
-            sig_y_lims: (end,start) value of disk-size in y-direction
+            q_lims: (end,start) value of disk y/x axis ratio
+            rc_lims: (end,start) value of disk core-size in elliptical radii
             alpha_lims: (end,start) value of power-law slope
 
         """
         # check input
-        sig_x_lims = np.array(sig_x_lims)
-        assert np.all(sig_x_lims > 0.)
-        sig_y_lims = np.array(sig_y_lims)
-        assert np.all(sig_y_lims > 0.)
+        q_lims = np.array(q_lims)
+        assert np.all(q_lims > 0.)
+        rc_lims = np.array(rc_lims)
+        assert np.all(rc_lims > 0.)
         alpha_lims = np.array(alpha_lims)
         assert np.all(alpha_lims >= 0.)
         # get parameters vs time
-        sig_xp = self.linear_interpolate_t(*sig_x_lims)
-        sig_yp = self.linear_interpolate_t(*sig_y_lims)
+        q = self.linear_interpolate_t(*q_lims)
+        rc = self.linear_interpolate_t(*rc_lims)
         alpha = self.linear_interpolate_t(*alpha_lims)
-        sig_xp = sig_xp[:, np.newaxis, np.newaxis]
-        sig_yp = sig_yp[:, np.newaxis, np.newaxis]
+        q = q[:, np.newaxis, np.newaxis]
+        rc = rc[:, np.newaxis, np.newaxis]
         alpha = alpha[:, np.newaxis, np.newaxis]
-        rr2 = (self.xxp/sig_xp)**2 + (self.yyp/sig_yp)**2
+        rr2 = self.xxp**2 + (self.yyp/q)**2
         rr = rr2 ** 0.5
-        rho = (rr+1.) ** -alpha
+        rho = (rr+rc) ** -alpha
         total_mass_per_t = np.sum(rho * self.cube.dx * self.cube.dy, (1,2))
         rho = (rho.T/total_mass_per_t).T
-        self.x_t_pars = dict(sig_x_lims=sig_x_lims,
-                             sig_y_lims=sig_y_lims,
+        self.x_t_pars = dict(q_lims=q_lims,
+                             rc_lims=rc_lims,
                              alpha_lims=alpha_lims)
         # rearrange shape from [t,x,y] to match function signature [x,y,t]
         rho = np.rollaxis(rho, 0, 3)
         self.p_x_t = rho
 
     def set_t_dep(self,
-                  sig_x=0.5,
-                  sig_y=0.1,
+                  q=0.1,
                   alpha=1.5,
                   t_dep_in=0.5,
                   t_dep_out=6.):
         """Set spatially-varying depletion timescale
 
-        t_dep varies as  power law in eliptical radius (with axes lengths
-        `sig_x` and `sig_y`) with power-law slope `alpha`, from central value
-        `t_dep_in` to outer value `t_dep_out`.
+        t_dep varies as  power law in eliptical radius (with axis ratio `q`)
+        with power-law slope `alpha`, from central value `t_dep_in` to outer
+        value `t_dep_out`.
 
         Args:
-            sig_x: x-axis length of ellipse of `t_dep` equicontours
-            sig_y : y-axis length of ellipse of `t_dep` equicontours
+            q : y/x axis ratio of ellipses of `t_dep` equicontours
             alpha : power law slope for varying `t_dep`
             t_dep_in : central value of `t_dep`
             t_dep_out : outer value of `t_dep`
 
         """
         # check input
-        assert sig_x > 0.
-        assert sig_y > 0.
+        assert q > 0.
         assert alpha >= 1.
         assert (t_dep_in > 0.1) and (t_dep_in < 10.0)
         assert (t_dep_out > 0.1) and (t_dep_out < 10.0)
         # evaluate t_dep maps
-        rr2 = (self.xxp/sig_x)**2 + (self.yyp/sig_y)**2
+        rr2 = self.xxp**2 + (self.yyp/q)**2
         rr = rr2**0.5
         log_t_dep_in = np.log(t_dep_in)
         log_t_dep_out = np.log(t_dep_out)
         delta_log_t_dep = log_t_dep_in - log_t_dep_out
         log_t_dep = log_t_dep_out + delta_log_t_dep * alpha**-rr
         t_dep = np.exp(log_t_dep)
-        self.t_dep_pars = dict(sig_x=sig_x,
-                               sig_y=sig_y,
+        self.t_dep_pars = dict(q=q,
                                alpha=alpha,
                                t_dep_in=t_dep_in,
                                t_dep_out=t_dep_out)
@@ -407,16 +406,66 @@ class growingDisk(component):
         self.p_z_tx = p_z_tx
 
     def set_mu_v(self,
-                 sig_x_lims=(0.5, 0.5),
-                 sig_y_lims=(0.5, 0.1),
+                 q_lims=(0.5, 0.5),
                  rmax_lims=(0.1, 1.),
-                 vmax_lims=(50., 250.),
-                 vinf_lims=(10., 50)):
+                 vmax_lims=(50., 250.)):
+        """Set age-and-space dependent mean velocities resembling rotating disks
+
+        Mean velocity maps have rotation-curves along x-axis peaking at v_max at
+        r_max then falling to 0 for r->inf. Given by the equation:
+        E[p(v|t,x)] = sgn(x) * |theta|/(pi/2) * Kr/(r+rc)^3
+        where
+        r^2 = x^2 + (y/q)^2,  theta = arctan(x/(y/q))
+        K and rc are chosen to give peak velocity vmax at distance rmax.
+        The quantities q, rc, rmax, vmax vary linearly with time
+        between their specified (end, start) values.
+
+        Args:
+            q_lims: (end,start) value of y/x axis ratio of mu(v) equicontours.
+            rmax_lims: distance of maximum velocity along x-axis.
+            vmax_lims: maximum velocity.
+
+        """
+        # check input
+        q_lims = np.array(q_lims)
+        assert np.all(q_lims > 0.)
+        rmax_lims = np.array(rmax_lims)
+        vmax_lims = np.array(vmax_lims)
+        sign_vmax = np.sign(vmax_lims)
+        # check vmax's have consistent directions and magnitudes
+        all_positive = np.isin(sign_vmax, [0,1])
+        all_negative = np.isin(sign_vmax, [0,-1])
+        assert np.all(all_positive) or np.all(all_negative)
+        # linearly interpolate and reshape inputs
+        q = self.linear_interpolate_t(*q_lims)
+        rmax = self.linear_interpolate_t(*rmax_lims)
+        vmax = self.linear_interpolate_t(*vmax_lims)
+        rc = 2.*rmax
+        K = vmax*(rmax+rc)**3/rmax
+        q = q[:, np.newaxis, np.newaxis]
+        rc = rc[:, np.newaxis, np.newaxis]
+        K = K[:, np.newaxis, np.newaxis]
+        # make mu_v maps
+        th = np.arctan2(self.yyp/q, self.xxp)
+        # idx = np.where(self.xxp==0)
+        # th[:, idx[0], idx[1]] = np.pi/2.
+        rr2 = self.xxp**2 + (self.yyp/q)**2
+        rr = rr2**0.5
+        mu_v = K*rr/(rr+rc)**3 * np.cos(th)
+        self.mu_v_pars = dict(q_lims=q_lims,
+                              rmax_lims=rmax_lims,
+                              vmax_lims=vmax_lims)
+        self.mu_v = mu_v
+
+    def set_mu_v_new(self,
+                     q_lims=(0.5, 0.1),
+                     rmax_lims=(0.1, 1.),
+                     vmax_lims=(50., 250.)):
         """Set age-and-space dependent mean velocities resembling rotating disks
 
         Mean velocity maps have rotation-curves along x-axis peaking at v_max at
         r_max then tending to vinf for larger r. Given by the equation:
-        E[p(v|t,x)] = sgn(x) * |theta|/(pi/2) * (vinf + Kr/(r+1)^alpha)
+        E[p(v|t,x)] = sgn(x) * |theta|/(pi/2) * Kr/(r+rc)^alpha
         where
         x' = x/sig_x, y' = y/sig_y
         r^2 = (x')^2 + (y')^2,  theta = arctan(x'/y')
@@ -427,7 +476,7 @@ class growingDisk(component):
         Args:
             sig_x_lims: (end,start) value of the x-extent of equicontours.
             sig_y_lims: (end,start) value of the y-extent of equicontours.
-            rmax_lims: distance of maximum velocity along x-axis.
+            rmax_lims: distance of maximum velocity along x-axis
             vmax_lims: maximum velocity along x-axis.
             vinf_lims: limit of velocity at large distance along x-axis.
 
@@ -491,8 +540,7 @@ class growingDisk(component):
         self.mu_v = mu_v
 
     def set_sig_v(self,
-                  sig_x_lims=(0.5, 0.5),
-                  sig_y_lims=(0.5, 0.1),
+                  q_lims=(0.5, 0.1),
                   alpha_lims=(1.5, 2.5),
                   sig_v_in_lims=(50., 250.),
                   sig_v_out_lims=(10., 50)):
@@ -500,23 +548,20 @@ class growingDisk(component):
 
         Dispersion maps vary as power-laws between central value sig_v_in, outer
         value sig_v_out, with slopes alpha. Velocity dispersion is constant on
-        ellipses with axis-lengths sig_x and sig_y. The quantities sig_x, sig_y,
-        alpha, sig_v_in, sig_v_out vary linearly with time between their
-        specified (end, start) values.
+        ellipses with y/x axis-ratio = q. The quantities q, alpha, sig_v_in,
+        sig_v_out vary linearly with time between their specified (end, start)
+        values.
 
         Args:
-            sig_x_lims: (end,start) value of the x-extent of equicontours.
-            sig_y_lims: (end,start) value of the y-extent of equicontours.
+            q_lims: (end,start) values of y/x axis-ratio of sigma equicontours.
             alpha_lims: (end,start) value of power-law slope.
             sig_v_in_lims: (end,start) value of central dispersion.
             sig_v_out_lims: (end,start) value of outer dispersion.
 
         """
         # check input
-        sig_x_lims = np.array(sig_x_lims)
-        assert np.all(sig_x_lims > 0.)
-        sig_y_lims = np.array(sig_y_lims)
-        assert np.all(sig_y_lims > 0.)
+        q_lims = np.array(q_lims)
+        assert np.all(q_lims > 0.)
         alpha_lims = np.array(alpha_lims)
         assert np.all(alpha_lims >= 1.)
         sig_v_in_lims = np.array(sig_v_in_lims)
@@ -524,26 +569,23 @@ class growingDisk(component):
         sig_v_out_lims = np.array(sig_v_out_lims)
         assert np.all(sig_v_out_lims > 0.)
         # linearly interpolate and reshape inputs
-        sig_xp = self.linear_interpolate_t(*sig_x_lims)
-        sig_yp = self.linear_interpolate_t(*sig_y_lims)
+        q = self.linear_interpolate_t(*q_lims)
         alpha = self.linear_interpolate_t(*alpha_lims)
         sig_v_in = self.linear_interpolate_t(*sig_v_in_lims)
         sig_v_out = self.linear_interpolate_t(*sig_v_out_lims)
-        sig_xp = sig_xp[:, np.newaxis, np.newaxis]
-        sig_yp = sig_yp[:, np.newaxis, np.newaxis]
+        q = q[:, np.newaxis, np.newaxis]
         alpha = alpha[:, np.newaxis, np.newaxis]
         sig_v_in = sig_v_in[:, np.newaxis, np.newaxis]
         sig_v_out = sig_v_out[:, np.newaxis, np.newaxis]
         # evaluate sig_v maps
-        rr2 = (self.xxp/sig_xp)**2 + (self.yyp/sig_yp)**2
+        rr2 = self.xxp**2 + (self.yyp/q)**2
         rr = rr2**0.5
         log_sig_v_in = np.log(sig_v_in)
         log_sig_v_out = np.log(sig_v_out)
         delta_log_sig_v = log_sig_v_in - log_sig_v_out
         log_sig = log_sig_v_out + delta_log_sig_v * alpha**-rr
         sig = np.exp(log_sig)
-        self.sig_v_pars = dict(sig_x_lims=sig_x_lims,
-                               sig_y_lims=sig_y_lims,
+        self.sig_v_pars = dict(q_lims=q_lims,
                                alpha_lims=alpha_lims,
                                sig_v_in_lims=sig_v_in_lims,
                                sig_v_out_lims=sig_v_out_lims)
@@ -1009,7 +1051,7 @@ class growingDisk(component):
         """
         kw_imshow = {'cmap':plt.cm.jet}
         img = self.cube.imshow(self.t_dep,
-                              colorbar_label='$t_\mathrm{dep}$',
+                              colorbar_label='$t_\\mathrm{dep}$',
                               **kw_imshow)
         plt.tight_layout()
         plt.show()
