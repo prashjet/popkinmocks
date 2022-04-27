@@ -26,7 +26,7 @@ class component(ABC):
     Args:
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
-        rotation: angle (degrees) between x-axes of component and cube.
+        rotation: angle (radians) between x-axes of component and cube.
 
     """
 
@@ -37,9 +37,8 @@ class component(ABC):
         self.cube = cube
         self.center = center
         self.rotation = rotation
-        theta = np.pi * rotation/180. # in radians
-        costh = np.cos(theta)
-        sinth = np.sin(theta)
+        costh = np.cos(rotation)
+        sinth = np.sin(rotation)
         rot_matrix = np.array([[costh, sinth],[-sinth,costh]])
         xxyy = np.dstack((self.cube.xx-self.center[0],
                           self.cube.yy-self.center[1]))
@@ -260,7 +259,7 @@ class growingDisk(component):
     Args:
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
-        rotation: angle (degrees) between x-axes of component and cube.
+        rotation: angle (radians) between x-axes of component and cube.
 
     """
     def __init__(self,
@@ -1054,7 +1053,7 @@ class stream(component):
     Args:
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
-        rotation: angle (degrees) between x-axes of component and cube.
+        rotation: angle (radians) between x-axes of component and cube.
         nsmp:
 
     """
