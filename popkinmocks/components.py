@@ -248,11 +248,11 @@ class growingDisk(component):
     p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
     where the factors are given by:
     - p(t) : a beta distribution (see `set_p_t`)
-    - p(x|t) : cored power-law stratified on elliptical radius with age-varying
-    power law slope and x- and y- extents (see `set_p_x_t`)
+    - p(x|t) : cored power-law stratified with age-varying flattening and slope
+    (see `set_p_x_t`)
     - p(v|t,x) : Gaussians with age-and-space varying means and dispersions.
     Means velocity maps resemble rotating disks (see `set_mu_v`) while
-    dispersions drop off as power-laws on elliptical radii (see `set_sig_v`)
+    dispersions drop off as power-laws on ellipses (see `set_sig_v`)
     - p(z|t,x) : chemical evolution model defined in equations 3-10 of
     Zhu et al 2020, parameterised by a spatially varying depletion
     timescale (see `set_p_z_tx`)
@@ -303,14 +303,13 @@ class growingDisk(component):
         Desnities are cored power-laws stratified on elliptical radius r,
         r^2 = x^2 + (y/q)^2
         p(x|t) = (r+rc)^-alpha
-        where the disk sizes and slopes
-        sig_x(t), sig_y(t), alpha(t)
-        vary linearly with time between their specified (end, start) values.
+        where the disk axis ratio q(t) and slope alpha(t) vary linearly with
+        stellar age between values specified for (young, old) stars.
 
         Args:
-            q_lims: (end,start) value of disk y/x axis ratio
-            rc_lims: (end,start) value of disk core-size in elliptical radii
-            alpha_lims: (end,start) value of power-law slope
+            q_lims: (young,old) value of disk y/x axis ratio
+            rc_lims: (young,old) value of disk core-size in elliptical radii
+            alpha_lims: (young,old) value of power-law slope
 
         """
         # check input
@@ -413,17 +412,17 @@ class growingDisk(component):
 
         Mean velocity maps have rotation-curves along x-axis peaking at v_max at
         r_max then falling to 0 for r->inf. Given by the equation:
-        E[p(v|t,x)] = sgn(x) * |theta|/(pi/2) * Kr/(r+rc)^3
+        E[p(v|t,[x,y])] = cos(theta) * Kr/(r+rc)^3
         where
         r^2 = x^2 + (y/q)^2,  theta = arctan(x/(y/q))
         K and rc are chosen to give peak velocity vmax at distance rmax.
-        The quantities q, rc, rmax, vmax vary linearly with time
-        between their specified (end, start) values.
+        The quantities q, rmax and vmax vary linearly with stellar age between
+        the values specified for (young,old) stars.
 
         Args:
-            q_lims: (end,start) value of y/x axis ratio of mu(v) equicontours.
-            rmax_lims: distance of maximum velocity along x-axis.
-            vmax_lims: maximum velocity.
+            q_lims: (young,old) value of y/x axis ratio of mu(v) equicontours.
+            rmax_lims: (young,old) distance of maximum velocity along x-axis.
+            vmax_lims: (young,old) maximum velocity.
 
         """
         # check input
@@ -457,88 +456,6 @@ class growingDisk(component):
                               vmax_lims=vmax_lims)
         self.mu_v = mu_v
 
-    def set_mu_v_new(self,
-                     q_lims=(0.5, 0.1),
-                     rmax_lims=(0.1, 1.),
-                     vmax_lims=(50., 250.)):
-        """Set age-and-space dependent mean velocities resembling rotating disks
-
-        Mean velocity maps have rotation-curves along x-axis peaking at v_max at
-        r_max then tending to vinf for larger r. Given by the equation:
-        E[p(v|t,x)] = sgn(x) * |theta|/(pi/2) * Kr/(r+rc)^alpha
-        where
-        x' = x/sig_x, y' = y/sig_y
-        r^2 = (x')^2 + (y')^2,  theta = arctan(x'/y')
-        K and alpha are chosen to give peak velocity vmax at distance rmax.
-        The quantities sig_x, sig_y, rmax, vmax and vinf vary linearly with time
-        between their specified (end, start) values.
-
-        Args:
-            sig_x_lims: (end,start) value of the x-extent of equicontours.
-            sig_y_lims: (end,start) value of the y-extent of equicontours.
-            rmax_lims: distance of maximum velocity along x-axis
-            vmax_lims: maximum velocity along x-axis.
-            vinf_lims: limit of velocity at large distance along x-axis.
-
-        """
-        # check input
-        sig_x_lims = np.array(sig_x_lims)
-        assert np.all(sig_x_lims > 0.)
-        sig_y_lims = np.array(sig_y_lims)
-        assert np.all(sig_y_lims > 0.)
-        #alpha_lims = np.array(alpha_lims)
-        #assert np.all(alpha_lims >= 1.)
-        vmax_lims = np.array(vmax_lims)
-        vinf_lims = np.array(vinf_lims)
-        sign_vmax = np.sign(vmax_lims)
-        sign_vinf = np.sign(vinf_lims)
-        # check vmax's and v0's have consistent directions and magnitudes
-        all_positive = np.isin(sign_vmax, [0,1])
-        all_negative = np.isin(sign_vmax, [0,-1])
-        assert np.all(all_positive) or np.all(all_negative)
-        all_positive = np.isin(sign_vinf, [0,1])
-        all_negative = np.isin(sign_vinf, [0,-1])
-        assert np.all(all_positive) or np.all(all_negative)
-        assert np.all(np.abs(vmax_lims) >= np.abs(vinf_lims))
-        # linearly interpolate and reshape inputs
-        sig_xp = self.linear_interpolate_t(*sig_x_lims)
-        sig_yp = self.linear_interpolate_t(*sig_y_lims)
-        rmax = self.linear_interpolate_t(*rmax_lims)
-        # next three lines calculate alpha_lims just to add to `self.mu_v_pars`
-        # to be able to compare `alpha_lims` with earlier implementations
-        rmax_lims = np.array(rmax_lims)
-        sig_x_lims = np.array(sig_x_lims)
-        alpha_lims = (rmax_lims/sig_x_lims+1.)/(rmax_lims/sig_x_lims)
-        alpha = (rmax/sig_xp+1.)/(rmax/sig_xp)
-        vmax = self.linear_interpolate_t(*vmax_lims)
-        vinf = self.linear_interpolate_t(*vinf_lims)
-        sig_xp = sig_xp[:, np.newaxis, np.newaxis]
-        sig_yp = sig_yp[:, np.newaxis, np.newaxis]
-        alpha = alpha[:, np.newaxis, np.newaxis]
-        vmax = vmax[:, np.newaxis, np.newaxis]
-        vinf = vinf[:, np.newaxis, np.newaxis]
-        # make mu_v maps
-        th = np.arctan(self.xxp/sig_xp/self.yyp*sig_yp)
-        idx = np.where(self.yyp==0)
-        th[:, idx[0], idx[1]] = np.pi/2.
-        th = np.abs(th)
-        th = th/np.pi*2.
-        self.th = th
-        rr2 = (self.xxp/sig_xp)**2 + (self.yyp/sig_yp)**2
-        rr = rr2**0.5
-        alpha_m1 = alpha - 1.
-        k = (vmax-vinf) * alpha**alpha / alpha_m1**alpha_m1
-        mu_v = vinf + k * rr / (rr+1.)**alpha
-        mu_v *= th
-        mu_v *= np.sign(self.xxp)
-        self.mu_v_pars = dict(sig_x_lims=sig_x_lims,
-                              sig_y_lims=sig_y_lims,
-                              rmax_lims=rmax_lims,
-                              vmax_lims=vmax_lims,
-                              vinf_lims=vinf_lims,
-                              alpha_lims=alpha_lims)
-        self.mu_v = mu_v
-
     def set_sig_v(self,
                   q_lims=(0.5, 0.1),
                   alpha_lims=(1.5, 2.5),
@@ -549,14 +466,14 @@ class growingDisk(component):
         Dispersion maps vary as power-laws between central value sig_v_in, outer
         value sig_v_out, with slopes alpha. Velocity dispersion is constant on
         ellipses with y/x axis-ratio = q. The quantities q, alpha, sig_v_in,
-        sig_v_out vary linearly with time between their specified (end, start)
-        values.
+        sig_v_out vary linearly with stellar age between values specified for
+        (young,old) stars.
 
         Args:
-            q_lims: (end,start) values of y/x axis-ratio of sigma equicontours.
-            alpha_lims: (end,start) value of power-law slope.
-            sig_v_in_lims: (end,start) value of central dispersion.
-            sig_v_out_lims: (end,start) value of outer dispersion.
+            q_lims: (young,old) values of y/x axis-ratio of sigma equicontours.
+            alpha_lims: (young,old) value of power-law slope.
+            sig_v_in_lims: (young,old) value of central dispersion.
+            sig_v_out_lims: (young,old) value of outer dispersion.
 
         """
         # check input
