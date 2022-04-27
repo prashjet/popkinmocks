@@ -77,7 +77,7 @@ def my_stream_component():
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
     stream = pkm.components.stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
-    stream.set_p_x(theta_lims=[-np.pi/2., 2.5*np.pi],
+    stream.set_p_x(theta_lims=[-np.pi/2., 0.75*np.pi],
                    mu_r_lims=[0.2,0.8],
                    nsmp=1000,
                    sig=0.1)

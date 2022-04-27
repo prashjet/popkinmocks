@@ -1079,7 +1079,9 @@ class stream(component):
         with varying theta. The track has a constant width on the sky, `sig`.
 
         Args:
-            theta_lims: (start, end) values of stream angle in radians.
+            theta_lims: (start, end) values of stream angle in radians. Must be
+            in -pi to pi. To cross negative x-axis, set non-zero rotation when
+            instantiating the stream component.
             mu_r_lims: (start, end) values of stream distance from center.
             sig (float): stream thickness.
             nsmp (int): number of points to sample the angle theta.
@@ -1088,6 +1090,8 @@ class stream(component):
             type: Description of returned object.
 
         """
+        assert np.min(theta_lims)>=-np.pi, "Angles must be in -pi<theta<pi'"
+        assert np.max(theta_lims)<=np.pi, "Angles must be in -pi<theta<pi'"
         self.theta_lims = theta_lims
         cube = self.cube
         theta0, theta1 = theta_lims
@@ -1341,7 +1345,10 @@ class stream(component):
         """
         th = np.arctan2(self.yyp, self.xxp)
         mu_v = np.zeros_like(th)
-        mu_v_lo, mu_v_hi = mu_v_lims
+        if self.theta_lims[0]<self.theta_lims[1]:
+            mu_v_lo, mu_v_hi = mu_v_lims
+        else:
+            mu_v_hi, mu_v_lo = mu_v_lims
         min_th, max_th = np.min(self.theta_lims), np.max(self.theta_lims)
         idx = np.where(th <= min_th)
         mu_v[idx] = mu_v_lo
