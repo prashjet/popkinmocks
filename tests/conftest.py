@@ -44,7 +44,7 @@ def my_second_component():
     ssps.get_light_weights()
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
     gc2 = pkm.components.growingDisk(cube=cube,
-                                     rotation=10.,
+                                     rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
     gc2.set_p_t(lmd=1.6, phi=0.3)
     gc2.set_p_x_t(q_lims=(1., 1.),
