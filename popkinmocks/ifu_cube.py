@@ -85,8 +85,8 @@ class IFUCube(object):
             noise_constant : scaing constant for the noise
 
         """
-        nrm = stats.norm(0, self.noise_constant*self.ybar**0.5)
         self.noise_constant = noise_constant
+        nrm = stats.norm(0, self.noise_constant*self.ybar**0.5)
         self.noise = nrm.rvs()
         self.yobs = self.ybar + self.noise
 
