@@ -139,27 +139,18 @@ class IFUCube(object):
               density=True,
               light_weighted=False,
               v_edg=None):
-        """Evaluate densities of the galaxy
+        """Evaluate population-kinematic densities of multi-component galaxy
 
-        5D densities over: stellar age (t), 2D position (x), velocity (v), and
-        metallicity (z). Which density to evaluate is specificed by `which_dist`
-        which can be one of:
-        - 't'
-        - 'x_t'
-        - 'tx'
-        - 'z_tx'
-        - 'txz'
-        - 'x'
-        - 'z'
-        - 'tz_x'
-        - 'tz'
-        - 'tvxz'
-        - 'vx'
-        - 'v_x'
-        - 'v'
-        where the underscore (if-present) represents conditioning i.e. calling
-        `get_p('tz_x')` will return p(t,z|x). This calls the `get_p...` methods
-        of the galaxy's consistituent components (n.b. these must be defined!)
+        Evaluate marginal or conditional densities over: stellar age (t), 2D
+        position (x), velocity (v) and metallicity (z). Argument `which_dist`
+        specifies which distribution to evaluate where underscore represents
+        conditioning e.g.
+        - `which_dist = 'tv'` --> p(t,v),
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc...
+        Variables in `which_dist` must be provided in alphabetical order (on
+        either side of the underscore if present). The galaxy is a mixture model
+        i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` and `collapse_cmps`
+        controls whether or not the density is collapsed over the components `i`
 
         Args:
             which_dist (string): which density to evaluate
@@ -169,29 +160,18 @@ class IFUCube(object):
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
-            v_edg (array): array of velocity-bin edges
+            v_edg (array): array of velocity-bin edged, required only if 'v' in
+                `which_dist`.
 
         Returns:
             array: the desired distribution. If `collapse_cmps=True`, then array
-                dimensions correspond to the order they are labelled in
-                `which_dist` string (with 2 for 2D posiion x). If
-                `collapse_cmps=False` the first array dimension represents
-                different components.
+                dimensions correspond to the order of variables as provided in
+                `which_dist` string e.g. `which_dist = tz_x` returns p(t,z|x) as
+                a 4D array with dimensions corresponding to [t,z,x1,x2].
+                If `collapse_cmps=False` the zero'th dimension will index over
+                different galaxy components.
 
         """
-        assert which_dist in ['t',
-                              'x_t',
-                              'tx',
-                              'z_tx',
-                              'txz',
-                              'x',
-                              'z',
-                              'tz_x',
-                              'tz',
-                              'tvxz',
-                              'vx',
-                              'v_x',
-                              'v']
         is_conditional = '_' in which_dist
         if is_conditional:
             p = self.get_conditional_distribution(
@@ -200,23 +180,102 @@ class IFUCube(object):
                 light_weighted=light_weighted,
                 v_edg=v_edg)
         else:
-            count = 0
-            for i, (cmp, w) in enumerate(zip(self.component_list,self.weights)):
-                p_func = getattr(cmp, 'get_p_'+which_dist)
-                if 'v' in which_dist:
-                    pi = w * p_func(v_edg=v_edg,
-                                    density=density,
-                                    light_weighted=light_weighted)
-                else:
-                    pi = w * p_func(density=density,
-                                    light_weighted=light_weighted)
-                if count == 0:
-                    p = np.zeros((self.n_cmps,) + pi.shape)
-                p[i] = pi
-                count += 1
+            if light_weighted:
+                p = self.get_marginal_distribution_light_wtd(
+                    which_dist,
+                    density=density,
+                    v_edg=v_edg)
+            else:
+                p = self.get_marginal_distribution_mass_wtd(
+                    which_dist,
+                    density=density,
+                    v_edg=v_edg)
         if collapse_cmps:
             p = np.sum(p, 0)
         return p
+
+    def get_marginal_distribution_mass_wtd(self,
+                                           which_dist,
+                                           density=True,
+                                           v_edg=None):
+        """Evaluate component-wise mass-weighted marginal distributions
+
+        Args:
+            which_dist (string): which density to evaluate (this must be
+                marginal, not conditional).
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            v_edg (array): array of velocity-bin edges.
+
+        Returns:
+            array: first dimension corresponds to components, subsequent
+                dimensions align with variables as listed in `which_dist`
+
+        """
+        count = 0
+        zipped_cmp_wts = zip(self.component_list,self.weights)
+        for i, (cmp, w) in enumerate(zipped_cmp_wts):
+            p_func = getattr(cmp, 'get_p_'+which_dist)
+            if 'v' in which_dist:
+                pi = w * p_func(v_edg=v_edg,
+                                density=density,
+                                light_weighted=False)
+            else:
+                pi = w * p_func(density=density, light_weighted=False)
+            if count == 0:
+                p = np.zeros((self.n_cmps,) + pi.shape)
+            p[i] = pi
+            count += 1
+        return p
+
+    def get_marginal_distribution_light_wtd(self,
+                                            which_dist,
+                                            density=True,
+                                            v_edg=None):
+        """Evaluate component-wise light-weighted marginal distributions
+
+        Args:
+            which_dist (string): which density to evaluate (this must be
+                marginal, not conditional).
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            v_edg (array): array of velocity-bin edges.
+
+        Returns:
+            array: first dimension corresponds to components, subsequent
+                dimensions align with variables as listed in `which_dist`
+
+        """
+        na = np.newaxis
+        if 'v' in which_dist:
+            current_dist = 'tvxz'
+            lw = self.ssps.light_weights[na,:,na,na,na,:]
+            P_mw = self.get_marginal_distribution_mass_wtd(
+                current_dist,
+                v_edg=v_edg,
+                density=False)
+        else:
+            current_dist = 'txz'
+            lw = self.ssps.light_weights[na,:,na,na,:]
+            P_mw = self.get_marginal_distribution_mass_wtd(current_dist,
+                                                           density=False)
+        P_lw = P_mw * lw
+        P_lw /= np.sum(P_lw)
+        # sum over any variables not in the desired distribution
+        if 't' not in which_dist:
+            P_lw = np.sum(P_lw, 1)
+        # don't swap the order of these next two operations!
+        if 'x' not in which_dist:
+            P_lw = np.sum(P_lw, (-3,-2))
+        if 'z' not in which_dist:
+            P_lw = np.sum(P_lw, -1)
+        if density:
+            volume_element = self.construct_volume_element(
+                             which_dist,
+                             collapse_cmps=False,
+                             v_edg=v_edg)
+            P_lw /= volume_element
+        return P_lw
 
     def get_conditional_distribution(self,
                                      which_dist,
@@ -282,9 +341,13 @@ class IFUCube(object):
             array: The volume element with correct shape for `which_dist`
 
         """
-        dist_string, marginal_string = which_dist.split('_')
+        dist_is_conditional = '_' in which_dist
+        if dist_is_conditional:
+            dist_string, marginal_string = which_dist.split('_')
+            marginal_string = marginal_string.replace('x', 'xy')
+        else:
+            dist_string = which_dist
         dist_string = dist_string.replace('x', 'xy')
-        marginal_string = marginal_string.replace('x', 'xy')
         if collapse_cmps is True:
             count = 0
             ndim = len(dist_string)
@@ -312,7 +375,8 @@ class IFUCube(object):
             dvol = dvol * da[idx]
             count += 1
         idx = tuple([slc for i in range(dvol.ndim)])
-        idx = idx + tuple([na for i in range(len(marginal_string))])
+        if dist_is_conditional:
+            idx = idx + tuple([na for i in range(len(marginal_string))])
         dvol = dvol[idx]
         return dvol
 
