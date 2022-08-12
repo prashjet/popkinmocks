@@ -1,632 +1,27 @@
 import numpy as np
 from scipy import stats, special
 from abc import ABC, abstractmethod
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 
 
-
-class component(ABC):
+class baseComponent(ABC):
     """Abstract base class to rerepsent a galaxy component
 
     A component is specified by it's joint density p(t,x,v,z) over stellar age
     t, 2D position x, line-of-sight velocity v, and metallicity z. Sub-classes
-    of `component` correspond to specific (i) factorisations of the joint
-    density and, (ii) implementations of the factors. Some details of p(t,x,v,z)
-    are shared between all components:
-    - the star formation history is independent of other variables - i.e. one
-    can factor p(t,x,v,z) = p(t) ...,
-    - p(t) is a beta distribution,
-    - age-metallicity relations from chemical evolution model from eqns 3-10
-    of Zhu et al 2020, parameterised by a depletion timescale `t_dep`,
-    - spatial properties are set in co-ordinate system defined by a center and
-    rotation relative to datacube x-axis.
+    of `baseComponent` correspond to specific (i) factorisations of the joint
+    density and, (ii) implementations of the factors.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
-        center (x0,y0): co-ordinates of the component center.
-        rotation: angle (radians) between x-axes of component and cube.
+        p_txvz: array, the 5D density p(t,v,x,z)
+        v_edg: array, the edges of velocity bins. Must have size
+            `p_txvz.shape[1]+1`
 
     """
-
-    def __init__(self,
-                 cube=None,
-                 center=(0,0),
-                 rotation=0.):
+    def __init__(self, cube=None, p_txvz=None, v_edg=None):
         self.cube = cube
-        self.center = center
-        self.rotation = rotation
-        costh = np.cos(rotation)
-        sinth = np.sin(rotation)
-        rot_matrix = np.array([[costh, sinth],[-sinth,costh]])
-        xxyy = np.dstack((self.cube.xx-self.center[0],
-                          self.cube.yy-self.center[1]))
-        xxyy_prime = np.einsum('kl,ijk',
-                               rot_matrix,
-                               xxyy,
-                               optimize=True)
-        self.xxp = xxyy_prime[:,:,0]
-        self.yyp = xxyy_prime[:,:,1]
-        self.get_z_interpolation_grid()
-
-    def get_beta_a_b_from_lmd_phi(self, lmd, phi):
-        """Convert from (total, mean) to (a,b) parameters of beta distribution
-
-        Args:
-            lmd: beta distribution total parameter, lmd>0
-            phi: beta distribution mean parameter, 0<phi<1
-
-        Returns:
-            (a,b): shape parameters
-
-        """
-        a = lmd * phi
-        b = lmd * (1. - phi)
-        return a, b
-
-    def set_p_t(self,
-                lmd=None,
-                phi=None,
-                cdf_start_end=(0.05, 0.95)):
-        """Set the star formation history
-
-        p(t) = Beta(t; lmd, phi), where (lmd, phi) are (total, mean) parameters.
-        Additionally this sets `self.t_pars` which is used for interpolating
-        quantities against t. Any time varying quantity (e.g. disk size) is
-        varied between start and end times as specified by CDF p(t).
-
-        Args:
-            lmd: beta distribution total parameter, lmd>0.
-            phi: beta distribution mean parameter, 0<phi<1.
-            cdf_start_end (tuple): CDF values of p(t) defining start and end
-            times of disk build up
-
-        Returns:
-            type: Description of returned object.
-
-        """
-        a, b = self.get_beta_a_b_from_lmd_phi(lmd, phi)
-        assert (a>1.)+(b>1) >= 1, "SFH is bimodal: increase lmd?'"
-        age_bin_edges = self.cube.ssps.par_edges[1]
-        age_loc = age_bin_edges[0]
-        age_scale = age_bin_edges[-1] - age_bin_edges[0]
-        beta = stats.beta(a, b,
-                          loc=age_loc,
-                          scale=age_scale)
-        beta_cdf = beta.cdf(age_bin_edges)
-        t_weights = beta_cdf[1:] - beta_cdf[:-1]
-        dt = age_bin_edges[1:] - age_bin_edges[:-1]
-        p_t = t_weights/dt
-        t_start_end = beta.ppf(cdf_start_end)
-        t_start, t_end = t_start_end
-        idx_start_end = np.digitize(t_start_end, age_bin_edges)
-        delta_t = t_end - t_start
-        self.t_pars = dict(lmd=lmd,
-                           phi=phi,
-                           t_start=t_start,
-                           t_end=t_end,
-                           delta_t=delta_t,
-                           idx_start_end=idx_start_end,
-                           dt=dt)
-        self.p_t = p_t
-
-    def plot_sfh(self):
-        """Plot the star-foramtion history p(t)
-        """
-        ax = plt.gca()
-        ax.plot(self.cube.ssps.par_cents[1], self.p_t, '-o')
-        ax.set_xlabel('Time [Gyr]')
-        ax.set_ylabel('pdf')
-        plt.tight_layout()
-        plt.show()
-        return
-
-    def get_z_interpolation_grid(self,
-                                 t_dep_lim=(0.1, 10.),
-                                 n_t_dep=1000,
-                                 n_z=1000):
-        """Store a grid used for interpolating age-metallicity relations
-
-        Args:
-            t_dep_lim: (lo,hi) allowed values of depletion timescale in Gyr
-            n_t_dep (int): number of steps to use for interpolating t_dep
-            n_z (int): number of steps to use for interpolating metallicity
-
-        """
-        a = -0.689
-        b = 1.899
-        self.ahat = 10.**a
-        self.bhat = b-1.
-        z_max = self.ahat**(-1./self.bhat)
-        # reduce z_max slightly to avoid divide by 0 warnings
-        z_max *= 0.9999
-        t_H = self.cube.ssps.par_edges[1][-1]
-        log_t_dep_lim = np.log10(t_dep_lim)
-        t_dep = np.logspace(*log_t_dep_lim, n_t_dep)
-        z_lim = (z_max, 0., n_z)
-        z = np.linspace(*z_lim, n_z)
-        tt_dep, zz = np.meshgrid(t_dep, z, indexing='ij')
-        t = t_H - tt_dep * zz/(1. - self.ahat * zz**self.bhat)
-        self.t = t
-        t_ssps = self.cube.ssps.par_cents[1]
-        n_t_ssps = len(t_ssps)
-        z_ssps = np.zeros((n_t_dep, n_t_ssps))
-        for i in range(n_t_dep):
-            z_ssps[i] = np.interp(t_ssps, t[i], z)
-        self.z_t_interp_grid = dict(t=t_ssps,
-                                    z=z_ssps,
-                                    t_dep=t_dep)
-
-    def evaluate_ybar(self):
-        """Evaluate the noise-free data-cube
-
-        Evaluate the integral
-        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
-        where
-        omega = ln(wavelength)
-        s(omega ; t,z) are stored SSP templates
-        This integral is a convolution over velocity v, which we evaluate using
-        Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
-        while FTs of the velocity factor P(v|t,x) of the density P(t,v,x,z)
-        are evaluated using the analytic expression of the FT of the normal
-        distribution. Sets the result to `self.ybar`.
-
-        """
-        cube = self.cube
-        ssps = cube.ssps
-        # get P(t,x,z)
-        P_txz = self.get_p_txz(density=False)
-        # get FT of P(v|t,x)
-        nl = ssps.FXw.shape[0]
-        omega = np.linspace(0, np.pi, nl)
-        omega /= ssps.dv
-        omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
-        exponent = -1j*self.mu_v*omega - 0.5*(self.sig_v*omega)**2
-        F_p_v_tx = np.exp(exponent)
-        # get FT of SSP templates s(w;t,z)
-        F_s_w_tz = ssps.FXw
-        F_s_w_tz = np.reshape(F_s_w_tz, (-1,)+ssps.par_dims)
-        # get FT of ybar
-        args = P_txz, F_p_v_tx, F_s_w_tz
-        F_ybar = np.einsum('txyz,wtxy,wzt->wxy', *args, optimize=True)
-        ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
-        self.ybar = ybar
-
-    def linear_interpolate_t(self,
-                             f_end,
-                             f_start):
-        """Linearly interpolate f against time, given boundary values
-
-        Args:
-            f_end: value of f at end of disk build up i.e. more recently
-            f_start: value of f at start of disk build up i.e. more in the past
-
-        Returns:
-            array: f interpolated in age-bins of SSP models, set to constant
-            values outside start/end times
-
-        """
-        t = self.cube.ssps.par_cents[1]
-        delta_f = f_start - f_end
-        t_from_start = t - self.t_pars['t_start']
-        f = f_end + delta_f/self.t_pars['delta_t'] * t_from_start
-        f[t < self.t_pars['t_start']] = f_end
-        f[t > self.t_pars['t_end']] = f_start
-        return f
-
-    @abstractmethod
-    def get_p_x_t(self, density=True, light_weighted=False):
-        """Get p(x|t)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        pass
-
-    @abstractmethod
-    def get_p_z_tx(self, density=True, light_weighted=False):
-        """Get p(z|t,x)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        pass
-
-    @abstractmethod
-    def get_p_v_tx(self, v_edg, density=True, light_weighted=False):
-        """Get p(v|t,x)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        pass
-
-    def get_p_t(self, density=True, light_weighted=False):
-        """Get p(t)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted is False:
-            p_t = self.p_t.copy()
-            if density is False:
-                p_t *= self.cube.ssps.delta_t
-        else:
-            p_tz = self.get_p_tz(density=False, light_weighted=True)
-            p_t = np.sum(p_tz, 1)
-            if density is True:
-                ssps = self.cube.ssps
-                p_t = p_t/ssps.delta_t
-        return p_t
-
-    def get_p_tv(self, v_edg, density=True, light_weighted=False):
-        """Get p(t,v)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
-        if density is True:
-            p_tvx *= self.cube.dx*self.cube.dy
-        p_tv = np.sum(p_tvx, (-1,-2))
-        return p_tv
-
-    def get_p_tx(self, density=True, light_weighted=False):
-        """Get p(t,x)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted is False:
-            p_x_t = self.get_p_x_t(density=density, light_weighted=False)
-            p_t = self.get_p_t(density=density, light_weighted=False)
-            p_xt = p_x_t*p_t
-            p_tx = np.einsum('xyt->txy', p_xt)
-        else:
-            p_txz = self.get_p_txz(density=density, light_weighted=True)
-            if density is True:
-                p_txz *= self.cube.ssps.delta_z
-            p_tx = np.sum(p_txz, -1)
-        return p_tx
-
-    def get_p_tz(self, density=True, light_weighted=False):
-        """Get p(t,z)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
-        if density is True:
-            p_txz *= self.cube.dx*self.cube.dy
-        p_tz = np.sum(p_txz, (1,2))
-        return p_tz
-
-    def get_p_tvx(self, v_edg, density=True, light_weighted=False):
-        """Get p(t,v,x)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted is False:
-            p_tx = self.get_p_tx(density=density, light_weighted=False)
-            p_v_tx = self.get_p_v_tx(v_edg,
-                                     density=density,
-                                     light_weighted=False)
-            na = np.newaxis
-            p_tvx = p_tx[:,na,:,:] * np.moveaxis(p_v_tx, 0, 1)
-        else:
-            p_tvxz = self.get_p_tvxz(v_edg,
-                                     density=density,
-                                     light_weighted=True)
-            if density is True:
-                p_tvxz *= self.cube.ssps.delta_z
-            p_tvx = np.sum(p_tvxz, -1)
-        return p_tvx
-
-    def get_p_tvz(self, v_edg, density=True, light_weighted=False):
-        """Get p(t,v,z)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_tvxz = self.get_p_tvxz(v_edg,
-                                 density=density,
-                                 light_weighted=light_weighted)
-        if density is True:
-            p_tvxz *= self.cube.dx*self.cube.dy
-        p_tvz = np.sum(p_tvxz, (2,3))
-        return p_tvz
-
-    def get_p_txz(self, density=True, light_weighted=False):
-        """Get p(t,x,z)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        na = np.newaxis
-        p_tx = self.get_p_tx(density=density, light_weighted=False)
-        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-        p_txz = p_tx[:,:,:,na] * np.moveaxis(p_z_tx, 0, -1)
-        if light_weighted:
-            P_txz_mass_wtd = self.get_p_txz(density=False, light_weighted=False)
-            light_weights = self.cube.ssps.light_weights[:,na,na,:]
-            P_txz_light_wtd = P_txz_mass_wtd * light_weights
-            normalisation = np.sum(P_txz_light_wtd)
-            p_txz = p_txz * light_weights / normalisation
-        return p_txz
-
-    def get_p_tvxz(self, v_edg, density=True, light_weighted=False):
-        """Get p(t,v,x,z)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        na = np.newaxis
-        p_txz = self.get_p_txz(density=density, light_weighted=False)
-        p_v_tx = self.get_p_v_tx(v_edg, density=density, light_weighted=False)
-        p_v_txz = p_v_tx[:,:,:,:,na]
-        p_tvxz = np.moveaxis(p_v_txz, 0, 1) * p_txz[:,na,:,:,:]
-        if light_weighted:
-            P_tvxz_mass_wtd = self.get_p_tvxz(v_edg,
-                                              density=False,
-                                              light_weighted=False)
-            light_weights = self.cube.ssps.light_weights[:,na,na,na,:]
-            P_tvxz_light_wtd = P_tvxz_mass_wtd * light_weights
-            normalisation = np.sum(P_tvxz_light_wtd)
-            p_tvxz = p_tvxz * light_weights / normalisation
-        return p_tvxz
-
-    def get_p_v(self, v_edg, density=True, light_weighted=False):
-        """Get p(v)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
-        if density is True:
-            p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
-            p_tvx *= self.cube.dx*self.cube.dy
-        p_v = np.sum(p_tvx, (0,2,3))
-        return p_v
-
-    def get_p_vx(self, v_edg, density=True, light_weighted=False):
-        """Get p(v,x)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-                volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-                mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
-        if density is True:
-            p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
-        p_vx = np.sum(p_tvx, 0)
-        return p_vx
-
-    def get_p_vz(self, v_edg, density=True, light_weighted=False):
-        """Get p(v,z)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_vxz = self.get_p_vxz(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
-        if density:
-            p_vxz *= self.cube.dx*self.cube.dy
-        p_vz = np.sum(p_vxz, (1,2))
-        return p_vz
-
-    def get_p_vxz(self, v_edg, density=True, light_weighted=False):
-        """Get p(v,x,z)
-
-        Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_tvxz = self.get_p_tvxz(v_edg,
-                                 density=density,
-                                 light_weighted=light_weighted)
-        if density:
-            p_tvxz = (p_tvxz.T * self.cube.ssps.delta_t).T
-        p_vxz = np.sum(p_tvxz, 0)
-        return p_vxz
-
-    def get_p_x(self, density=True, light_weighted=False):
-        """Get p(x)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted is False:
-            p_x_t = self.get_p_x_t(density=density)
-            P_t = self.get_p_t(density=False)
-            p_x = np.sum(p_x_t * P_t, -1)
-        else:
-            na = np.newaxis
-            ssps = self.cube.ssps
-            p_txz = self.get_p_txz(density=density, light_weighted=True)
-            if density is False:
-                p_x = np.sum(p_txz, (0,3))
-            else:
-                delta_tz = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,na,na,:]
-                p_x = np.sum(p_txz*delta_tz, (0,3))
-        return p_x
-
-    def get_p_xz(self, density=True, light_weighted=False):
-        """Get p(x,z)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
-        if density:
-            p_txz = (p_txz.T * self.cube.ssps.delta_t).T
-        p_xz = np.sum(p_txz, 0)
-        return p_xz
-
-    def get_p_z(self, density=True, light_weighted=False):
-        """Get p(z)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        na = np.newaxis
-        if light_weighted is False:
-            p_z_tx = self.get_p_z_tx(density=density)
-            P_x_t = self.get_p_x_t(density=False) # to marginalise, must be a probabilty
-            P_x_t = np.einsum('xyt->txy', P_x_t)
-            P_x_t = P_x_t[na,:,:,:]
-            P_t = self.get_p_t(density=False) # to marginalise, must be a probabilty
-            P_t = P_t[na,:,na,na]
-            p_z = np.sum(p_z_tx * P_x_t * P_t, (1,2,3))
-        else:
-            p_tz = self.get_p_tz(density=density, light_weighted=True)
-            if density is False:
-                p_z = np.sum(p_tz, 0)
-            else:
-                ssps = self.cube.ssps
-                delta_t = ssps.delta_t[:,na]
-                p_z = np.sum(p_tz*delta_t, 0)
-        return p_z
+        self.p_txvz = p_txvz
+        self.v_edg = v_edg
 
     def get_p(self,
               which_dist,
@@ -810,5 +205,429 @@ class component(ABC):
         dvol = dvol[idx]
         return dvol
 
+    def get_E_v_x(self, light_weighted=False):
+        """Get mean velocity map E[p(v|x)]
 
-# end
+        Args:
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        # TODO: implement this for the general case
+        pass
+
+    def get_jth_central_moment_v_x(self, j, light_weighted=False):
+        """Get j'th central moment of velocity map E[p((v-mu_v)^j|x)]
+
+        Args:
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        # TODO: implement this for the general case
+        pass
+
+    def get_variance_v_x(self, light_weighted=False):
+        """Get variance velocity map
+
+        Args:
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        var_v_x = self.get_jth_central_moment_v_x(
+            2,
+            light_weighted=light_weighted)
+        return var_v_x
+
+    def get_skewness_v_x(self, light_weighted=False):
+        """Get skewness of velocity map
+
+        Args:
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        mu3_v_x = self.get_jth_central_moment_v_x(
+            3,
+            light_weighted=light_weighted)
+        var_v_x = self.get_jth_central_moment_v_x(
+            2,
+            light_weighted=light_weighted)
+        skewness_v_x = mu3_v_x/var_v_x**1.5
+        return skewness_v_x
+
+    def get_kurtosis_v_x(self, light_weighted=False):
+        """Get kurtosis of velocity map
+
+        Args:
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        mu4_v_x = self.get_jth_central_moment_v_x(
+            4,
+            light_weighted=light_weighted)
+        var_v_x = self.get_jth_central_moment_v_x(
+            2,
+            light_weighted=light_weighted)
+        kurtosis_v_x = mu4_v_x/var_v_x**2.
+        return kurtosis_v_x
+
+    def evaluate_ybar(self, v_edg=None):
+        """Evaluate the noise-free data-cube
+
+        Evaluate the integral
+        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
+        where
+        omega = ln(wavelength)
+        s(omega ; t,z) are stored SSP templates
+        This integral is a convolution over velocity v, which we evaluate using
+        Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
+        while FTs of the velocity part of the density P(t,v,x,z) are evaluated
+        using FFTs here. Sets the result to `self.ybar`.
+
+        Args:
+            p_tvxz (array): the density array with dimensions corresponding to
+                (t,v,x1,x2,z).
+            v_edg (array): array of velocity-bin edges. Number of bins must
+                equal p_tvxz.shape[1]. One of the bins must be centered on v=0.
+
+        """
+        cube = self.cube
+        ssps = cube.ssps
+        assert v_edg.size==p_tvxz.shape[1]+1
+        assert np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv)
+        v = (v_edg[:-1]+v_edg[1:])/2.
+        v0_idx = np.where(v==0.)
+        assert v0_idx[0].size==1
+        v0_idx = v0_idx[0][0]
+        assert np.all(np.sort(v)==v)
+        p_tvxz = self.get_p_tvxz(v_edg=v_edg, density=True)
+        na = np.newaxis
+        dtz = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
+        F_s_w_tz = np.reshape(ssps.FXw, (-1,)+ssps.par_dims)
+        F_s_w_tz = np.moveaxis(F_s_w_tz, -1, 0)
+        F_s_w_tz = F_s_w_tz[:,:,na,na,:]
+        # move v=0 to correct position for the FFT
+        p_tvxz = np.roll(p_tvxz, p_tvxz.shape[1]-v0_idx, axis=1)
+        F_p_tvxz = np.fft.rfft(p_tvxz, axis=1) * ssps.dv
+        # interpolate FFT to same shape as FFT of SSPs
+        interpolator = interpolate.interp1d(
+                    np.linspace(0, 1, F_p_tvxz.shape[1]),
+                    F_p_tvxz,
+                    axis=1,
+                    kind='cubic',
+                    bounds_error=True)
+        F_p_tvxz = interpolator(np.linspace(0, 1, F_s_w_tz.shape[1]))
+        F_y = F_s_w_tz*F_p_tvxz
+        y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
+        y = np.sum(y*dtz, (0,4)) * self.dx * self.dy
+        self.ybar = y
+
+    def get_p_t(self, density=True, light_weighted=False):
+        """Get p(t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_t = np.sum(p_tvxz, (1,2,3,4))
+        if density:
+            p_t /= self.cube.ssps.delta_t
+        return p_t
+
+    def get_p_tv(self, v_edg, density=True, light_weighted=False):
+        """Get p(t,v)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_tv = np.sum(p_tvxz, (2,3,4))
+        if density:
+            p_tv /= self.construct_volume_element('tv', v_edg=self.v_edg)
+        return p_tv
+
+    def get_p_tx(self, density=True, light_weighted=False):
+        """Get p(t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_tx = np.sum(p_tvxz, (1,4))
+        if density:
+            p_tx /= self.construct_volume_element('tx')
+        return p_tx
+
+    def get_p_tz(self, density=True, light_weighted=False):
+        """Get p(t,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_tz = np.sum(p_tvxz, (1,2,3))
+        if density:
+            p_tz /= self.construct_volume_element('tz')
+        return p_tz
+
+    def get_p_tvx(self, v_edg, density=True, light_weighted=False):
+        """Get p(t,v,x)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_tvx = np.sum(p_tvxz, 4)
+        if density:
+            p_tvx /= self.construct_volume_element('tvx', v_edg=self.v_edg)
+        return p_tvx
+
+    def get_p_tvz(self, v_edg, density=True, light_weighted=False):
+        """Get p(t,v,z)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_tvz = np.sum(p_tvxz, (2,3))
+        if density:
+            p_tvz /= self.construct_volume_element('tvz', v_edg=self.v_edg)
+        return p_tvz
+
+    def get_p_txz(self, density=True, light_weighted=False):
+        """Get p(t,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_txz = np.sum(p_tvxz, 1)
+        if density:
+            p_txz /= self.construct_volume_element('txz')
+        return p_txz
+
+    def get_p_tvxz(self, v_edg, density=True, light_weighted=False):
+        """Get p(t,v,x,z)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.p_tvxz
+        if density is False:
+            p_tvxz *= self.construct_volume_element('tvxz', v_edg=v_edg)
+        return p_txz
+
+    def get_p_v(self, v_edg, density=True, light_weighted=False):
+        """Get p(v)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_v = np.sum(p_tvxz, (0,2,3,4))
+        if density:
+            p_v /= self.construct_volume_element('v', v_edg=v_edg)
+        return p_v
+
+    def get_p_vx(self, v_edg, density=True, light_weighted=False):
+        """Get p(v,x)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_vx = np.sum(p_tvxz, (0,4))
+        if density:
+            p_vx /= self.construct_volume_element('vx', v_edg=v_edg)
+        return p_vx
+
+    def get_p_vz(self, v_edg, density=True, light_weighted=False):
+        """Get p(v,z)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_vz = np.sum(p_tvxz, (0,2,3))
+        if density:
+            p_vz /= self.construct_volume_element('vz', v_edg=v_edg)
+        return p_vz
+
+    def get_p_vxz(self, v_edg, density=True, light_weighted=False):
+        """Get p(v,x,z)
+
+        Args:
+            v_edg : array of velocity-bin edges to evaluate the quantity
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_vxz = np.sum(p_tvxz, 0)
+        if density:
+            p_vxz /= self.construct_volume_element('vxz', v_edg=v_edg)
+        return p_vxz
+
+    def get_p_x(self, density=True, light_weighted=False):
+        """Get p(x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_x = np.sum(p_tvxz, (0,1,4))
+        if density:
+            p_x /= self.construct_volume_element('x')
+        return p_x
+
+    def get_p_xz(self, density=True, light_weighted=False):
+        """Get p(x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_xz = np.sum(p_tvxz, (0,1))
+        if density:
+            p_xz /= self.construct_volume_element('xz')
+        return p_xz
+
+    def get_p_z(self, density=True, light_weighted=False):
+        """Get p(z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
+        p_z = np.sum(p_tvxz, (0,1,2,3))
+        if density:
+            p_z /= self.construct_volume_element('z')
+        return p_z

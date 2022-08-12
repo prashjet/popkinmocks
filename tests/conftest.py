@@ -3,10 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import popkinmocks as pkm
 
-################################
-# growing disks
-################################
-
 def my_component():
     ssps = pkm.model_grids.milesSSPs()
     ssps.logarithmically_resample(dv=100.)
@@ -77,30 +73,20 @@ def my_stream_component():
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
     stream = pkm.components.stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
-    stream.set_p_x(theta_lims=[-np.pi/2., 0.75*np.pi],
-                   mu_r_lims=[0.2,0.8],
-                   nsmp=1000,
-                   sig=0.1)
-    stream.set_p_z_t(t_dep=5.)
-    stream.set_p_v_x(mu_v_lims=[-100,100], sig_v=110.)
+    stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
+                     mu_r_lims=[0.2,0.8],
+                     nsmp=1000,
+                     sig=0.1)
+    stream.set_t_dep(t_dep=5.)
+    stream.set_p_z_tx()
+    stream.set_mu_v(mu_v_lims=[-100,100])
+    stream.set_sig_v(sig_v=110.)
     stream.evaluate_ybar()
     return ssps, cube, stream
 
 @pytest.fixture(scope="module", name='my_stream_component')
 def my_stream_component_fixture():
     return my_stream_component()
-
-def my_three_component_cube(
-    my_component,
-    my_second_component,
-    my_stream_component):
-    """Makes a cube with three components
-    """
-    ssps, cube, gc1 = my_component()
-    gc2 = my_second_component()
-    ssps, cube, stream = my_stream_component()
-    cube.combine_components([gc1, gc2, stream], [0.65, 0.25, 0.1])
-    return cube
 
 @pytest.fixture(scope="module", name="my_three_component_cube")
 def my_three_component_cube_fixture(
