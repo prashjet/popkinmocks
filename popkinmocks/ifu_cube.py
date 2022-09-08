@@ -15,15 +15,16 @@ class IFUCube(object):
         ny (int): number of pixels in y-dimension
         xrng (tuple): start/end co-ordinates in x-direction
         yrng (tuple): start/end co-ordinates in x-direction
+        v_edg (array): velocity bin edges used to evaluate densities.
 
     """
-
     def __init__(self,
                  ssps=None,
                  nx=300,
                  ny=299,
                  xrng=(-1,1),
-                 yrng=(-1,1)):
+                 yrng=(-1,1),
+                 v_edg=np.linspace(-1000, 1000, 201)):
         self.ssps = ssps
         self.nx = nx
         self.ny = ny
@@ -37,6 +38,7 @@ class IFUCube(object):
         xx, yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.xx = xx
         self.yy = yy
+        self.v_edg = v_edg
 
     def combine_components(self,
                            component_list=None,
@@ -106,18 +108,13 @@ class IFUCube(object):
             dill.dump(self, f)
 
     def save_numpy(self,
-                   v_edg=None,
                    direc=None,
                    fname=None):
         if os.path.isdir(direc) is False:
             os.mkdir(direc)
-        if v_edg is None:
-            v_edg = np.arange(-1000, 1001, self.ssps.dv)
+        v_edg = self.v_edg
         u_edg = np.log(1. + v_edg/self.ssps.speed_of_light)
-        p_tvxz = self.get_p('tvxz',
-                            collapse_cmps=True,
-                            density=True,
-                            v_edg=v_edg)
+        p_tvxz = self.get_p('tvxz', collapse_cmps=True, density=True)
         f_xvtz = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
         np.savez(direc + fname,
                  nx1=self.nx,
@@ -137,8 +134,7 @@ class IFUCube(object):
               which_dist,
               collapse_cmps=False,
               density=True,
-              light_weighted=False,
-              v_edg=None):
+              light_weighted=False):
         """Evaluate population-kinematic densities of multi-component galaxy
 
         Evaluate marginal or conditional densities over: stellar age (t), 2D
@@ -160,8 +156,6 @@ class IFUCube(object):
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
-            v_edg (array): array of velocity-bin edged, required only if 'v' in
-                `which_dist`.
 
         Returns:
             array: the desired distribution. If `collapse_cmps=True`, then array
@@ -177,27 +171,23 @@ class IFUCube(object):
             p = self.get_conditional_distribution(
                 which_dist,
                 density=density,
-                light_weighted=light_weighted,
-                v_edg=v_edg)
+                light_weighted=light_weighted)
         else:
             if light_weighted:
                 p = self.get_marginal_distribution_light_wtd(
                     which_dist,
-                    density=density,
-                    v_edg=v_edg)
+                    density=density)
             else:
                 p = self.get_marginal_distribution_mass_wtd(
                     which_dist,
-                    density=density,
-                    v_edg=v_edg)
+                    density=density)
         if collapse_cmps:
             p = np.sum(p, 0)
         return p
 
     def get_marginal_distribution_mass_wtd(self,
                                            which_dist,
-                                           density=True,
-                                           v_edg=None):
+                                           density=True):
         """Evaluate component-wise mass-weighted marginal distributions
 
         Args:
@@ -205,7 +195,6 @@ class IFUCube(object):
                 marginal, not conditional).
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
-            v_edg (array): array of velocity-bin edges.
 
         Returns:
             array: first dimension corresponds to components, subsequent
@@ -216,12 +205,7 @@ class IFUCube(object):
         zipped_cmp_wts = zip(self.component_list,self.weights)
         for i, (cmp, w) in enumerate(zipped_cmp_wts):
             p_func = getattr(cmp, 'get_p_'+which_dist)
-            if 'v' in which_dist:
-                pi = w * p_func(v_edg=v_edg,
-                                density=density,
-                                light_weighted=False)
-            else:
-                pi = w * p_func(density=density, light_weighted=False)
+            pi = w * p_func(density=density, light_weighted=False)
             if count == 0:
                 p = np.zeros((self.n_cmps,) + pi.shape)
             p[i] = pi
@@ -230,8 +214,7 @@ class IFUCube(object):
 
     def get_marginal_distribution_light_wtd(self,
                                             which_dist,
-                                            density=True,
-                                            v_edg=None):
+                                            density=True):
         """Evaluate component-wise light-weighted marginal distributions
 
         Args:
@@ -239,7 +222,6 @@ class IFUCube(object):
                 marginal, not conditional).
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
-            v_edg (array): array of velocity-bin edges.
 
         Returns:
             array: first dimension corresponds to components, subsequent
@@ -250,15 +232,12 @@ class IFUCube(object):
         if 'v' in which_dist:
             current_dist = 'tvxz'
             lw = self.ssps.light_weights[na,:,na,na,na,:]
-            P_mw = self.get_marginal_distribution_mass_wtd(
-                current_dist,
-                v_edg=v_edg,
-                density=False)
         else:
             current_dist = 'txz'
             lw = self.ssps.light_weights[na,:,na,na,:]
-            P_mw = self.get_marginal_distribution_mass_wtd(current_dist,
-                                                           density=False)
+        P_mw = self.get_marginal_distribution_mass_wtd(
+            current_dist,
+            density=False)
         P_lw = P_mw * lw
         P_lw /= np.sum(P_lw)
         # sum over any variables not in the desired distribution
@@ -272,16 +251,14 @@ class IFUCube(object):
         if density:
             volume_element = self.construct_volume_element(
                              which_dist,
-                             collapse_cmps=False,
-                             v_edg=v_edg)
+                             collapse_cmps=False)
             P_lw /= volume_element
         return P_lw
 
     def get_conditional_distribution(self,
                                      which_dist,
                                      light_weighted=False,
-                                     density=True,
-                                     v_edg=None):
+                                     density=True):
         """Get conditional distributions
 
         This is intended to be called only by the `get_p` wrapper method - see
@@ -291,7 +268,6 @@ class IFUCube(object):
         which_dist (string): which density to evaluate
         density (bool): whether to return probabilty density (True) or the
         volume-element weighted probabilty (False)
-        v_edg (array): array of velocity-bin edges
 
         Returns:
         array: the desired distribution.
@@ -301,9 +277,7 @@ class IFUCube(object):
         dist, marginal = which_dist.split('_')
          # get an alphabetically ordered string for the joint distribution
         joint = ''.join(sorted(dist+marginal))
-        kwargs = {'density':False,
-                  'v_edg':v_edg,
-                  'light_weighted':light_weighted}
+        kwargs = {'density':False, 'light_weighted':light_weighted}
         p_joint = self.get_p(joint, collapse_cmps=False, **kwargs)
         p_marginal = self.get_p(marginal, collapse_cmps=True, **kwargs)
         # if x is in joint/marginalal, repalace it with xy to account for the
@@ -321,21 +295,19 @@ class IFUCube(object):
         # get the conditional probability
         p_conditional = p_joint/p_marginal
         if density:
-            dvol = self.construct_volume_element(which_dist, v_edg=v_edg)
+            dvol = self.construct_volume_element(which_dist)
             p_conditional = p_conditional/dvol
         return p_conditional
 
     def construct_volume_element(self,
                                  which_dist,
-                                 collapse_cmps=True,
-                                 v_edg=None):
+                                 collapse_cmps=True):
         """Construct volume element for converting densities to probabilties
 
         Args:
             which_dist (string): which density to evaluate
             collapse_cmps (bool): whether to collapse component densities
                 together (True) or leave them in-tact (False)
-            v_edg (array): array of velocity-bin edges
 
         Returns:
             array: The volume element with correct shape for `which_dist`
@@ -362,7 +334,7 @@ class IFUCube(object):
             if var=='t':
                 da = self.ssps.delta_t
             elif var=='v':
-                da = v_edg[1:] - v_edg[:-1]
+                da = self.v_edg[1:] - self.v_edg[:-1]
             elif var=='x':
                 da = np.array([self.dx])
             elif var=='y':

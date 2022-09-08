@@ -14,20 +14,20 @@ class baseComponent(ABC):
     Args:
         cube: a pkm.mock_cube.mockCube.
         p_txvz: array, the 5D density p(t,v,x,z)
-        v_edg: array, the edges of velocity bins. Must have size
-            `p_txvz.shape[1]+1`
 
     """
-    def __init__(self, cube=None, p_txvz=None, v_edg=None):
+    def __init__(self, cube=None, p_txvz=None):
         self.cube = cube
-        self.p_txvz = p_txvz
-        self.v_edg = v_edg
+        dtvxz = self.construct_volume_element('tvxz')
+        if p_txvz.shape==dtvxz.shape:
+            self.p_txvz = p_txvz
+        else:
+            raise ValueError(f'`p_txvz` must have shape {dtvxz.shape}')
 
     def get_p(self,
               which_dist,
               density=True,
-              light_weighted=False,
-              v_edg=None):
+              light_weighted=False):
         """Evaluate population-kinematic densities of this galaxy component
 
         Evaluate marginal or conditional densities over: stellar age (t), 2D
@@ -45,8 +45,6 @@ class baseComponent(ABC):
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
-            v_edg (array): array of velocity-bin edged, required only if 'v' in
-                `which_dist`.
 
         Returns:
             array: the desired distribution. Array dimensions correspond to the
@@ -61,20 +59,17 @@ class baseComponent(ABC):
             p = self.get_conditional_distribution(
                 which_dist,
                 density=density,
-                light_weighted=light_weighted,
-                v_edg=v_edg)
+                light_weighted=light_weighted)
         else:
             p = self.get_marginal_distribution(
                 which_dist,
                 density=density,
-                light_weighted=light_weighted,
-                v_edg=v_edg)
+                light_weighted=light_weighted)
         return p
 
     def get_marginal_distribution(self,
                                   which_dist,
                                   density=True,
-                                  v_edg=None,
                                   light_weighted=False):
         """Evaluate component-wise marginal distributions
 
@@ -83,7 +78,6 @@ class baseComponent(ABC):
                 marginal, not conditional).
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
-            v_edg (array): array of velocity-bin edges.
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
 
@@ -93,19 +87,13 @@ class baseComponent(ABC):
         """
         # TODO: check that `which_dist` has no underscore and is alphabetical
         p_func = getattr(self, 'get_p_'+which_dist)
-        if 'v' in which_dist:
-            p = p_func(v_edg=v_edg,
-                       density=density,
-                       light_weighted=light_weighted)
-        else:
-            p = p_func(density=density, light_weighted=light_weighted)
+        p = p_func(density=density, light_weighted=light_weighted)
         return p
 
     def get_conditional_distribution(self,
                                      which_dist,
                                      light_weighted=False,
-                                     density=True,
-                                     v_edg=None):
+                                     density=True):
         """Get conditional distributions
 
         This is intended to be called only by the `get_p` wrapper method - see
@@ -115,7 +103,6 @@ class baseComponent(ABC):
         which_dist (string): which density to evaluate
         density (bool): whether to return probabilty density (True) or the
         volume-element weighted probabilty (False)
-        v_edg (array): array of velocity-bin edges
 
         Returns:
         array: the desired distribution.
@@ -126,19 +113,11 @@ class baseComponent(ABC):
         # if the conditional distribution is hard coded, then use that...
         if hasattr(self, 'get_p_'+which_dist):
             p_func = getattr(self, 'get_p_'+which_dist)
-            if 'v' in dist:
-                 p_conditional = p_func(v_edg,
-                                        density=density,
-                                        light_weighted=light_weighted)
-            else:
-                 p_conditional = p_func(density=density,
-                                        light_weighted=light_weighted)
+            p_cond = p_func(density=density, light_weighted=light_weighted)
         # ... otherwise compute conditional = joint/marginal
         else:
             joint = ''.join(sorted(dist+marginal))
-            kwargs = {'density':False,
-                      'v_edg':v_edg,
-                      'light_weighted':light_weighted}
+            kwargs = {'density':False, 'light_weighted':light_weighted}
             p_joint = self.get_p(joint, **kwargs)
             p_marginal = self.get_p(marginal, **kwargs)
             # if x is in joint/marginalal, repalace it with xy to account for the
@@ -152,20 +131,17 @@ class baseComponent(ABC):
             new_pos_in_joint = [-(i+1) for i in range(n_marginal)][::-1]
             p_joint = np.moveaxis(p_joint, old_pos_in_joint, new_pos_in_joint)
             # get the conditional probability
-            p_conditional = p_joint/p_marginal
+            p_cond = p_joint/p_marginal
             if density:
-                dvol = self.construct_volume_element(which_dist, v_edg=v_edg)
-                p_conditional = p_conditional/dvol
-        return p_conditional
+                dvol = self.construct_volume_element(which_dist)
+                p_cond = p_cond/dvol
+        return p_cond
 
-    def construct_volume_element(self,
-                                 which_dist,
-                                 v_edg=None):
+    def construct_volume_element(self, which_dist):
         """Construct volume element for converting densities to probabilties
 
         Args:
             which_dist (string): which density to evaluate
-            v_edg (array): array of velocity-bin edges
 
         Returns:
             array: The volume element with correct shape for `which_dist`
@@ -187,6 +163,7 @@ class baseComponent(ABC):
             if var=='t':
                 da = self.cube.ssps.delta_t
             elif var=='v':
+                v_edg = self.cube.v_edg
                 da = v_edg[1:] - v_edg[:-1]
             elif var=='x':
                 da = np.array([self.dx])
@@ -289,7 +266,7 @@ class baseComponent(ABC):
         kurtosis_v_x = mu4_v_x/var_v_x**2.
         return kurtosis_v_x
 
-    def evaluate_ybar(self, v_edg=None):
+    def evaluate_ybar(self):
         """Evaluate the noise-free data-cube
 
         Evaluate the integral
@@ -305,17 +282,16 @@ class baseComponent(ABC):
         Args:
             p_tvxz (array): the density array with dimensions corresponding to
                 (t,v,x1,x2,z).
-            v_edg (array): array of velocity-bin edges. Number of bins must
-                equal p_tvxz.shape[1]. One of the bins must be centered on v=0.
 
         """
         cube = self.cube
         ssps = cube.ssps
-        assert v_edg.size==p_tvxz.shape[1]+1
-        assert np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv)
+        v_edg = cube.v_edg
+        assert v_edg.size==p_tvxz.shape[1]+1, 'v array inconsistent shape'
+        assert np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv), 'v array must be spaced with ssps.dv'
         v = (v_edg[:-1]+v_edg[1:])/2.
         v0_idx = np.where(v==0.)
-        assert v0_idx[0].size==1
+        assert v0_idx[0].size==1, 'v array must be zero-centered'
         v0_idx = v0_idx[0][0]
         assert np.all(np.sort(v)==v)
         p_tvxz = self.get_p_tvxz(v_edg=v_edg, density=True)
@@ -359,11 +335,10 @@ class baseComponent(ABC):
             p_t /= self.cube.ssps.delta_t
         return p_t
 
-    def get_p_tv(self, v_edg, density=True, light_weighted=False):
+    def get_p_tv(self, density=True, light_weighted=False):
         """Get p(t,v)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -376,7 +351,7 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_tv = np.sum(p_tvxz, (2,3,4))
         if density:
-            p_tv /= self.construct_volume_element('tv', v_edg=self.v_edg)
+            p_tv /= self.construct_volume_element('tv')
         return p_tv
 
     def get_p_tx(self, density=True, light_weighted=False):
@@ -417,11 +392,10 @@ class baseComponent(ABC):
             p_tz /= self.construct_volume_element('tz')
         return p_tz
 
-    def get_p_tvx(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvx(self, density=True, light_weighted=False):
         """Get p(t,v,x)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -434,14 +408,13 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_tvx = np.sum(p_tvxz, 4)
         if density:
-            p_tvx /= self.construct_volume_element('tvx', v_edg=self.v_edg)
+            p_tvx /= self.construct_volume_element('tvx')
         return p_tvx
 
-    def get_p_tvz(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvz(self, density=True, light_weighted=False):
         """Get p(t,v,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -454,7 +427,7 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_tvz = np.sum(p_tvxz, (2,3))
         if density:
-            p_tvz /= self.construct_volume_element('tvz', v_edg=self.v_edg)
+            p_tvz /= self.construct_volume_element('tvz')
         return p_tvz
 
     def get_p_txz(self, density=True, light_weighted=False):
@@ -476,11 +449,10 @@ class baseComponent(ABC):
             p_txz /= self.construct_volume_element('txz')
         return p_txz
 
-    def get_p_tvxz(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvxz(self, density=True, light_weighted=False):
         """Get p(t,v,x,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -492,14 +464,13 @@ class baseComponent(ABC):
         """
         p_tvxz = self.p_tvxz
         if density is False:
-            p_tvxz *= self.construct_volume_element('tvxz', v_edg=v_edg)
+            p_tvxz *= self.construct_volume_element('tvxz')
         return p_txz
 
-    def get_p_v(self, v_edg, density=True, light_weighted=False):
+    def get_p_v(self, density=True, light_weighted=False):
         """Get p(v)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -512,14 +483,13 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_v = np.sum(p_tvxz, (0,2,3,4))
         if density:
-            p_v /= self.construct_volume_element('v', v_edg=v_edg)
+            p_v /= self.construct_volume_element('v')
         return p_v
 
-    def get_p_vx(self, v_edg, density=True, light_weighted=False):
+    def get_p_vx(self, density=True, light_weighted=False):
         """Get p(v,x)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -532,14 +502,13 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_vx = np.sum(p_tvxz, (0,4))
         if density:
-            p_vx /= self.construct_volume_element('vx', v_edg=v_edg)
+            p_vx /= self.construct_volume_element('vx')
         return p_vx
 
-    def get_p_vz(self, v_edg, density=True, light_weighted=False):
+    def get_p_vz(self, density=True, light_weighted=False):
         """Get p(v,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -552,14 +521,13 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_vz = np.sum(p_tvxz, (0,2,3))
         if density:
-            p_vz /= self.construct_volume_element('vz', v_edg=v_edg)
+            p_vz /= self.construct_volume_element('vz')
         return p_vz
 
-    def get_p_vxz(self, v_edg, density=True, light_weighted=False):
+    def get_p_vxz(self, density=True, light_weighted=False):
         """Get p(v,x,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -572,7 +540,7 @@ class baseComponent(ABC):
         p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
         p_vxz = np.sum(p_tvxz, 0)
         if density:
-            p_vxz /= self.construct_volume_element('vxz', v_edg=v_edg)
+            p_vxz /= self.construct_volume_element('vxz')
         return p_vxz
 
     def get_p_x(self, density=True, light_weighted=False):

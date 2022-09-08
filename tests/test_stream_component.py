@@ -90,7 +90,7 @@ def test_component_normalisation(my_stream_component):
 
     """
     ssps, cube, stream = my_stream_component
-    v_edg = np.linspace(-900, 900, 20)
+    v_edg = cube.v_edg
     dv = v_edg[1] - v_edg[0]
     na = np.newaxis
     # check p_t
@@ -177,35 +177,35 @@ def test_component_normalisation(my_stream_component):
     a = stream.get_p_tz(density=True, light_weighted=True)
     assert np.isclose(np.sum(a*ssps.delta_t[:,na]*ssps.delta_z[na,:]), 1.)
     # check get_p_v
-    a = stream.get_p_v(v_edg, density=False, light_weighted=False)
+    a = stream.get_p_v(density=False, light_weighted=False)
     assert np.isclose(np.sum(a), 1.)
-    a = stream.get_p_v(v_edg, density=True, light_weighted=False)
+    a = stream.get_p_v(density=True, light_weighted=False)
     assert np.isclose(np.sum(a*dv), 1.)
-    a = stream.get_p_v(v_edg, density=False, light_weighted=True)
+    a = stream.get_p_v(density=False, light_weighted=True)
     assert np.isclose(np.sum(a), 1.)
-    a = stream.get_p_v(v_edg, density=True, light_weighted=True)
+    a = stream.get_p_v(density=True, light_weighted=True)
     assert np.isclose(np.sum(a*dv), 1.)
     # check get_p_tvxz
-    a = stream.get_p_tvxz(v_edg, density=False, light_weighted=False)
+    a = stream.get_p_tvxz(density=False, light_weighted=False)
     assert np.isclose(np.sum(a), 1)
-    a = stream.get_p_tvxz(v_edg, density=True, light_weighted=False)
+    a = stream.get_p_tvxz(density=True, light_weighted=False)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
-    a = stream.get_p_tvxz(v_edg, density=False, light_weighted=True)
+    a = stream.get_p_tvxz(density=False, light_weighted=True)
     assert np.isclose(np.sum(a), 1)
-    a = stream.get_p_tvxz(v_edg, density=True, light_weighted=True)
+    a = stream.get_p_tvxz(density=True, light_weighted=True)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
     # check get_p_v_tx
-    a = stream.get_p('v_tx', v_edg=v_edg, density=False, light_weighted=False)
+    a = stream.get_p('v_tx', density=False, light_weighted=False)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = stream.get_p('v_tx', v_edg=v_edg, density=True, light_weighted=False)
+    a = stream.get_p('v_tx', density=True, light_weighted=False)
     assert np.allclose(np.sum(a*dv, 0), 1.)
-    a = stream.get_p('v_tx', v_edg=v_edg, density=False, light_weighted=True)
+    a = stream.get_p('v_tx', density=False, light_weighted=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = stream.get_p('v_tx', v_edg=v_edg, density=True, light_weighted=True)
+    a = stream.get_p('v_tx', density=True, light_weighted=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
     # check p_tz_x
     a = stream.get_p('tz_x', density=False, light_weighted=False)
@@ -219,13 +219,13 @@ def test_component_normalisation(my_stream_component):
     vol_elmt = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,:,na,na]
     assert np.allclose(np.sum(a*vol_elmt, (0,1)), 1.)
     # check get_p_v_x
-    a = stream.get_p('v_x', v_edg=v_edg, density=False, light_weighted=False)
+    a = stream.get_p('v_x', density=False, light_weighted=False)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = stream.get_p('v_x', v_edg=v_edg, density=True, light_weighted=False)
+    a = stream.get_p('v_x', density=True, light_weighted=False)
     assert np.allclose(np.sum(a*dv, 0), 1.)
-    a = stream.get_p('v_x', v_edg=v_edg, density=False, light_weighted=True)
+    a = stream.get_p('v_x', density=False, light_weighted=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = stream.get_p('v_x', v_edg=v_edg, density=True, light_weighted=True)
+    a = stream.get_p('v_x', density=True, light_weighted=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
 
 def test_component_ybar(

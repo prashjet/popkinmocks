@@ -86,7 +86,7 @@ def test_three_component_cube_normalisations(my_three_component_cube):
     """
     cube = my_three_component_cube
     ssps = cube.ssps
-    v_edg = np.linspace(-1000, 1000, 50)
+    v_edg = cube.v_edg
     dv = v_edg[1] - v_edg[0]
     na = np.newaxis
     # check p_t
@@ -175,44 +175,44 @@ def test_three_component_cube_normalisations(my_three_component_cube):
     a = cube.get_p('tz', density=True, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a*ssps.delta_t[:,na]*ssps.delta_z[na,:]), 1.)
     # # check get_p_vx
-    a = cube.get_p('vx', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('vx', density=False, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('vx', density=True, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv*cube.dx*cube.dy), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('vx', density=False, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('vx', density=True, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv*cube.dx*cube.dy), 1.)
     # check get_p_tvxz
-    a = cube.get_p('tvxz', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=False, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=True, light_weighted=False, collapse_cmps=True)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=False, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=True, light_weighted=True, collapse_cmps=True)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
     # check get_p_v_x
-    a = cube.get_p('v_x', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v_x', density=False, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v_x', density=True, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v_x', density=False, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v_x', density=True, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
     # check get_p_v
-    a = cube.get_p('v', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v', density=False, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v', density=True, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a*dv), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v', density=False, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v', density=True, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a*dv), 1.)
 
 

@@ -22,6 +22,7 @@ class parametricComponent(base.baseComponent):
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
         rotation: angle (radians) between x-axes of component and cube.
+        v_edg (array): velocity bin edges used to evaluate densities.
 
     """
 
@@ -44,6 +45,7 @@ class parametricComponent(base.baseComponent):
         self.xxp = xxyy_prime[:,:,0]
         self.yyp = xxyy_prime[:,:,1]
         self.get_z_interpolation_grid()
+        self.v_edg = cube.v_edg
 
     def get_beta_a_b_from_lmd_phi(self, lmd, phi):
         """Convert from (total, mean) to (a,b) parameters of beta distribution
@@ -172,11 +174,10 @@ class parametricComponent(base.baseComponent):
         """
         pass
 
-    def get_p_v_tx(self, v_edg, density=True, light_weighted=False):
+    def get_p_v_tx(self, density=True, light_weighted=False):
         """Get p(v|t,x)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -188,16 +189,16 @@ class parametricComponent(base.baseComponent):
         """
         na = np.newaxis
         if light_weighted is False:
-            v_edg = v_edg[:, na, na, na]
+            v_edg = self.v_edg[:, na, na, na]
             norm = stats.norm(loc=self.mu_v, scale=self.sig_v)
             p_v_tx = norm.cdf(v_edg[1:]) - norm.cdf(v_edg[:-1])
             if density is True:
                 dv = v_edg[1:] - v_edg[:-1]
                 p_v_tx /= dv
         else:
-            p_tvxz = self.get_p_tvxz(v_edg, density=True, light_weighted=True)
+            p_tvxz = self.get_p_tvxz(density=True, light_weighted=True)
             if density is False:
-                dv = v_edg[1:] - v_edg[:-1]
+                dv = self.v_edg[1:] - self.v_edg[:-1]
                 dv = dv[na, :, na, na, na]
                 p_tvxz = p_tvxz*dv
             ssps = self.cube.ssps
@@ -373,11 +374,10 @@ class parametricComponent(base.baseComponent):
                 p_t = p_t/ssps.delta_t
         return p_t
 
-    def get_p_tv(self, v_edg, density=True, light_weighted=False):
+    def get_p_tv(self, density=True, light_weighted=False):
         """Get p(t,v)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -387,9 +387,7 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
+        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             p_tvx *= self.cube.dx*self.cube.dy
         p_tv = np.sum(p_tvx, (-1,-2))
@@ -439,11 +437,10 @@ class parametricComponent(base.baseComponent):
         p_tz = np.sum(p_txz, (1,2))
         return p_tz
 
-    def get_p_tvx(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvx(self, density=True, light_weighted=False):
         """Get p(t,v,x)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -455,25 +452,20 @@ class parametricComponent(base.baseComponent):
         """
         if light_weighted is False:
             p_tx = self.get_p_tx(density=density, light_weighted=False)
-            p_v_tx = self.get_p_v_tx(v_edg,
-                                     density=density,
-                                     light_weighted=False)
+            p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
             na = np.newaxis
             p_tvx = p_tx[:,na,:,:] * np.moveaxis(p_v_tx, 0, 1)
         else:
-            p_tvxz = self.get_p_tvxz(v_edg,
-                                     density=density,
-                                     light_weighted=True)
+            p_tvxz = self.get_p_tvxz(density=density, light_weighted=True)
             if density is True:
                 p_tvxz *= self.cube.ssps.delta_z
             p_tvx = np.sum(p_tvxz, -1)
         return p_tvx
 
-    def get_p_tvz(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvz(self, density=True, light_weighted=False):
         """Get p(t,v,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -483,9 +475,7 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(v_edg,
-                                 density=density,
-                                 light_weighted=light_weighted)
+        p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
         if density is True:
             p_tvxz *= self.cube.dx*self.cube.dy
         p_tvz = np.sum(p_tvxz, (2,3))
@@ -516,11 +506,10 @@ class parametricComponent(base.baseComponent):
             p_txz = p_txz * light_weights / normalisation
         return p_txz
 
-    def get_p_tvxz(self, v_edg, density=True, light_weighted=False):
+    def get_p_tvxz(self, density=True, light_weighted=False):
         """Get p(t,v,x,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -532,12 +521,11 @@ class parametricComponent(base.baseComponent):
         """
         na = np.newaxis
         p_txz = self.get_p_txz(density=density, light_weighted=False)
-        p_v_tx = self.get_p_v_tx(v_edg, density=density, light_weighted=False)
+        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
         p_v_txz = p_v_tx[:,:,:,:,na]
         p_tvxz = np.moveaxis(p_v_txz, 0, 1) * p_txz[:,na,:,:,:]
         if light_weighted:
-            P_tvxz_mass_wtd = self.get_p_tvxz(v_edg,
-                                              density=False,
+            P_tvxz_mass_wtd = self.get_p_tvxz(density=False,
                                               light_weighted=False)
             light_weights = self.cube.ssps.light_weights[:,na,na,na,:]
             P_tvxz_light_wtd = P_tvxz_mass_wtd * light_weights
@@ -545,11 +533,10 @@ class parametricComponent(base.baseComponent):
             p_tvxz = p_tvxz * light_weights / normalisation
         return p_tvxz
 
-    def get_p_v(self, v_edg, density=True, light_weighted=False):
+    def get_p_v(self, density=True, light_weighted=False):
         """Get p(v)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -559,20 +546,17 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
+        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
             p_tvx *= self.cube.dx*self.cube.dy
         p_v = np.sum(p_tvx, (0,2,3))
         return p_v
 
-    def get_p_vx(self, v_edg, density=True, light_weighted=False):
+    def get_p_vx(self, density=True, light_weighted=False):
         """Get p(v,x)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -582,19 +566,16 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_tvx = self.get_p_tvx(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
+        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
         p_vx = np.sum(p_tvx, 0)
         return p_vx
 
-    def get_p_vz(self, v_edg, density=True, light_weighted=False):
+    def get_p_vz(self, density=True, light_weighted=False):
         """Get p(v,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -604,19 +585,16 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_vxz = self.get_p_vxz(v_edg,
-                               density=density,
-                               light_weighted=light_weighted)
+        p_vxz = self.get_p_vxz(density=density, light_weighted=light_weighted)
         if density:
             p_vxz *= self.cube.dx*self.cube.dy
         p_vz = np.sum(p_vxz, (1,2))
         return p_vz
 
-    def get_p_vxz(self, v_edg, density=True, light_weighted=False):
+    def get_p_vxz(self, density=True, light_weighted=False):
         """Get p(v,x,z)
 
         Args:
-            v_edg : array of velocity-bin edges to evaluate the quantity
             density (bool): whether to return probabilty density (True) or the
             volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -626,9 +604,7 @@ class parametricComponent(base.baseComponent):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(v_edg,
-                                 density=density,
-                                 light_weighted=light_weighted)
+        p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
         if density:
             p_tvxz = (p_tvxz.T * self.cube.ssps.delta_t).T
         p_vxz = np.sum(p_tvxz, 0)

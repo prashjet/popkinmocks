@@ -8,7 +8,8 @@ def my_component():
     ssps.logarithmically_resample(dv=100.)
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
+    v_edg = np.linspace(-900, 900, 20)
+    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
     gc1 = pkm.components.growingDisk(cube=cube, rotation=0., center=(0,0))
     gc1.set_p_t(lmd=2., phi=0.8)
     gc1.set_p_x_t(q_lims=(0.05, 0.5),
@@ -38,7 +39,8 @@ def my_second_component():
     ssps.logarithmically_resample(dv=100.)
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
+    v_edg = np.linspace(-900, 900, 20)
+    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
     gc2 = pkm.components.growingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
@@ -70,7 +72,8 @@ def my_stream_component():
     ssps.logarithmically_resample(dv=100.)
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10)
+    v_edg = np.linspace(-900, 900, 20)
+    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
     stream = pkm.components.stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
     stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
