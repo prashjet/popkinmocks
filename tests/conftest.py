@@ -10,7 +10,7 @@ def my_component():
     ssps.get_light_weights()
     v_edg = np.linspace(-900, 900, 20)
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
-    gc1 = pkm.components.growingDisk(cube=cube, rotation=0., center=(0,0))
+    gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0,0))
     gc1.set_p_t(lmd=2., phi=0.8)
     gc1.set_p_x_t(q_lims=(0.05, 0.5),
                   rc_lims=(1., 1.),
@@ -41,7 +41,7 @@ def my_second_component():
     ssps.get_light_weights()
     v_edg = np.linspace(-900, 900, 20)
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
-    gc2 = pkm.components.growingDisk(cube=cube,
+    gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
     gc2.set_p_t(lmd=1.6, phi=0.3)
@@ -74,7 +74,7 @@ def my_stream_component():
     ssps.get_light_weights()
     v_edg = np.linspace(-900, 900, 20)
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
-    stream = pkm.components.stream(cube=cube, rotation=0., center=(0.,0))
+    stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
     stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
                      mu_r_lims=[0.2,0.8],

@@ -1,22 +1,24 @@
 import numpy as np
-from scipy import stats, special
+from scipy import stats
 from . import parametric
 
-class growingDisk(parametric.parametricComponent):
+class GrowingDisk(parametric.ParametricComponent):
     """A growing disk with age-and-space dependent velocities and enrichments
 
     The (mass-weighted) joint density of this component can be factorised as
     p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
     where the factors are given by:
     - p(t) : a beta distribution (see `set_p_t`)
-    - p(x|t) : cored power-law stratified with age-varying flattening and slope
-    (see `set_p_x_t`)
-    - p(v|t,x) : Gaussians with age-and-space varying means and dispersions.
-    Means velocity maps resemble rotating disks (see `set_mu_v`) while
-    dispersions drop off as power-laws on ellipses (see `set_sig_v`)
-    - p(z|t,x) : chemical evolution model defined in equations 3-10 of
-    Zhu et al 2020, parameterised by a spatially varying depletion
-    timescale (see `set_p_z_tx`)
+    - p(x|t) : cored power-law in elliptical radius with age-varying core-size,
+    flattening and slope (see `set_p_x_t`)
+    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where mean maps resemble
+    rotating disks (see `set_mu_v`) while dispersion varies as power-laws on
+    elliptical radius (see `set_sig_v`)
+    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
+    enrichment (i.e. metallicity vs t) depends on depletion timescale t_dep(x)
+    varying as as power law in eliptical radius (see `set_t_dep`). The functions
+    mu_z(t,t_dep) and sig_z(t,t_dep) are taken from equations 3-10 of Zhu, van
+    de Venn, Leaman et al 20.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -34,8 +36,8 @@ class growingDisk(parametric.parametricComponent):
         Desnities are cored power-laws stratified on elliptical radius r,
         r^2 = x^2 + (y/q)^2
         p(x|t) = (r+rc)^-alpha
-        where the disk axis ratio q(t) and slope alpha(t) vary linearly with
-        stellar age between values specified for (young, old) stars.
+        where the disk axis ratio q(t), slope alpha(t) and core radius rc(t)
+        vary linearly with t between values specified for (young, old) stars.
 
         Args:
             q_lims: (young,old) value of disk y/x axis ratio
@@ -76,9 +78,9 @@ class growingDisk(parametric.parametricComponent):
                   t_dep_out=6.):
         """Set spatially-varying depletion timescale
 
-        t_dep varies as  power law in eliptical radius (with axis ratio `q`)
-        with power-law slope `alpha`, from central value `t_dep_in` to outer
-        value `t_dep_out`.
+        t_dep varies as power law in eliptical radius with axis ratio q with
+        power-law slope alpha, from central value t_dep_in to outer
+        value t_dep_out.
 
         Args:
             q : y/x axis ratio of ellipses of `t_dep` equicontours
@@ -118,8 +120,8 @@ class growingDisk(parametric.parametricComponent):
         where
         r^2 = x^2 + (y/q)^2,  theta = arctan(x/(y/q))
         K and rc are chosen to give peak velocity vmax at distance rmax.
-        The quantities q, rmax and vmax vary linearly with stellar age between
-        the values specified for (young,old) stars.
+        The quantities q, rmax and vmax vary linearly with t between the values
+        specified for (young, old) stars.
 
         Args:
             q_lims: (young,old) value of y/x axis ratio of mu(v) equicontours.

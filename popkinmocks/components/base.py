@@ -1,19 +1,17 @@
 import numpy as np
-from scipy import stats, special
-from abc import ABC, abstractmethod
 
 
-class baseComponent(ABC):
-    """Abstract base class to rerepsent a galaxy component
+class Component(object):
+    """A galaxy component
 
     A component is specified by it's joint density p(t,x,v,z) over stellar age
     t, 2D position x, line-of-sight velocity v, and metallicity z. Sub-classes
-    of `baseComponent` correspond to specific (i) factorisations of the joint
+    of `Component` correspond to specific (i) factorisations of the joint
     density and, (ii) implementations of the factors.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
-        p_txvz: array, the 5D density p(t,v,x,z)
+        p_txvz (array): the 5D density p(t,x1,x2,v,z)
 
     """
     def __init__(self, cube=None, p_txvz=None):
@@ -28,14 +26,14 @@ class baseComponent(ABC):
               which_dist,
               density=True,
               light_weighted=False):
-        """Evaluate population-kinematic densities of this galaxy component
+        """Evaluate population-kinematic distributions for this component
 
-        Evaluate marginal or conditional densities over: stellar age (t), 2D
-        position (x), velocity (v) and metallicity (z). Argument `which_dist`
-        specifies which distribution to evaluate where underscore represents
-        conditioning e.g.
+        Evaluate marginal or conditional distributions over stellar age t, 2D
+        position x, velocity v and metallicity z. The argument `which_dist`
+        specifies which distribution to evaluate, where an underscore (if
+        present) represents conditioning e.g.
         - `which_dist = 'tv'` --> p(t,v),
-        - `which_dist = 'tz_x'` --> p(t,z|x) etc...
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
         Variables in `which_dist` must be provided in alphabetical order (on
         either side of the underscore if present).
 
@@ -71,11 +69,13 @@ class baseComponent(ABC):
                                   which_dist,
                                   density=True,
                                   light_weighted=False):
-        """Evaluate component-wise marginal distributions
+        """Evaluate marginal distributions for this component
+
+        This is intended to be called only by the `get_p` wrapper method - see
+        that docstring for more info.
 
         Args:
-            which_dist (string): which density to evaluate (this must be
-                marginal, not conditional).
+            which_dist (string): which density to evaluate.
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -94,15 +94,18 @@ class baseComponent(ABC):
                                      which_dist,
                                      light_weighted=False,
                                      density=True):
-        """Get conditional distributions
+        """Get conditional distributions for this component
 
         This is intended to be called only by the `get_p` wrapper method - see
-        that docstring for more info.
+        that docstring for more info. Evaluates conditionals as the quotient of
+        two marginal distributions.
 
         Args:
-        which_dist (string): which density to evaluate
-        density (bool): whether to return probabilty density (True) or the
-        volume-element weighted probabilty (False)
+            which_dist (string): which density to evaluate.
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
 
         Returns:
         array: the desired distribution.
@@ -267,7 +270,7 @@ class baseComponent(ABC):
         return kurtosis_v_x
 
     def evaluate_ybar(self):
-        """Evaluate the noise-free data-cube
+        """Evaluate the datacube for this component
 
         Evaluate the integral
         ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
@@ -275,32 +278,47 @@ class baseComponent(ABC):
         omega = ln(wavelength)
         s(omega ; t,z) are stored SSP templates
         This integral is a convolution over velocity v, which we evaluate using
-        Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
-        while FTs of the velocity part of the density P(t,v,x,z) are evaluated
-        using FFTs here. Sets the result to `self.ybar`.
-
-        Args:
-            p_tvxz (array): the density array with dimensions corresponding to
-                (t,v,x1,x2,z).
+        FFTs. FFTs of SSP templates are stored in`ssps.FXw` while FFTs of
+        (velocity part of) the density P(t,v,x,z) are evaluated here. Sets the
+        result to `self.ybar`.
 
         """
         cube = self.cube
         ssps = cube.ssps
         v_edg = cube.v_edg
-        assert v_edg.size==p_tvxz.shape[1]+1, 'v array inconsistent shape'
-        assert np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv), 'v array must be spaced with ssps.dv'
-        v = (v_edg[:-1]+v_edg[1:])/2.
-        v0_idx = np.where(v==0.)
-        assert v0_idx[0].size==1, 'v array must be zero-centered'
-        v0_idx = v0_idx[0][0]
-        assert np.all(np.sort(v)==v)
-        p_tvxz = self.get_p_tvxz(v_edg=v_edg, density=True)
+        def validate_v_edg():
+            error_string = 'Velocity array must be '
+            # correct uniform spacing
+            check1 = np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv)
+            if not check1:
+                error_string += '(i) uniformly spaced'
+            # ascending
+            v = (v_edg[:-1]+v_edg[1:])/2.
+            check2 = np.all(np.sort(v)==v)
+            if not check2:
+                error_string += '(ii) ascending'
+            # zero-centered
+            v0_idx = np.where(np.isclose(v, 0.))
+            v0_idx = v0_idx[0][0]
+            if v.size % 2 == 1:
+                check3 = (v0_idx==(v.size-1)/2)
+            else:
+                check3 = (v0_idx==v.size/2)
+            if not check3:
+                error_string += '(iii) zero-centered.'
+            if check1 and check2 and check3:
+                pass
+            else:
+                raise ValueError(error_string)
+        validate_v_edg()
         na = np.newaxis
         dtz = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
         F_s_w_tz = np.reshape(ssps.FXw, (-1,)+ssps.par_dims)
         F_s_w_tz = np.moveaxis(F_s_w_tz, -1, 0)
         F_s_w_tz = F_s_w_tz[:,:,na,na,:]
         # move v=0 to correct position for the FFT
+        p_tvxz = self.get_p_tvxz(v_edg=v_edg, density=True)
+        v0_idx = np.where(np.isclose(v, 0.))[0][0]
         p_tvxz = np.roll(p_tvxz, p_tvxz.shape[1]-v0_idx, axis=1)
         F_p_tvxz = np.fft.rfft(p_tvxz, axis=1) * ssps.dv
         # interpolate FFT to same shape as FFT of SSPs

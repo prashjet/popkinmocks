@@ -5,9 +5,10 @@ import os
 import dill
 
 class IFUCube(object):
-    """An IFU representing a galaxy composed of a mixture of components
+    """An IFU datacube of a galaxy modelled as a mixture of components
 
-    Add components to the galaxy datacube using the `combine_components` method.
+    The galaxy is a mixture i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` - add
+    components to the galaxy using the `combine_components` method.
 
     Args:
         ssps : SPP template, in a `pkm.model_grids.milesSSPs` object
@@ -45,7 +46,8 @@ class IFUCube(object):
                            weights=None):
         """Combine galaxy components as a mixture model
 
-        Stores the components, weights and evaluates to mixture ybar.
+        Stores the components, weights and evaluates the combined datacube
+        signal ybar.
 
         Args:
             component_list (list): list of 'pkm.components.component` objects
@@ -95,7 +97,7 @@ class IFUCube(object):
     def save_data(self,
                   direc=None,
                   fname=None):
-        """Save the IFUCube object
+        """Save the IFUCube object as a dill dump
 
         Args:
             direc (string): directory name
@@ -110,6 +112,13 @@ class IFUCube(object):
     def save_numpy(self,
                    direc=None,
                    fname=None):
+        """Save the IFUCube object as a numpy npz file
+
+        Args:
+            direc (string): directory name
+            fname (string): filename
+
+        """
         if os.path.isdir(direc) is False:
             os.mkdir(direc)
         v_edg = self.v_edg
@@ -135,14 +144,14 @@ class IFUCube(object):
               collapse_cmps=False,
               density=True,
               light_weighted=False):
-        """Evaluate population-kinematic densities of multi-component galaxy
+        """Evaluate population-kinematic distributions of multi-component galaxy
 
-        Evaluate marginal or conditional densities over: stellar age (t), 2D
-        position (x), velocity (v) and metallicity (z). Argument `which_dist`
-        specifies which distribution to evaluate where underscore represents
-        conditioning e.g.
+        Evaluate marginal or conditional densities over: stellar age t, 2D
+        position x, velocity v and metallicity z. Argument `which_dist`
+        specifies which distribution to evaluate where underscore (if
+        present) represents conditioning e.g.
         - `which_dist = 'tv'` --> p(t,v),
-        - `which_dist = 'tz_x'` --> p(t,z|x) etc...
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
         Variables in `which_dist` must be provided in alphabetical order (on
         either side of the underscore if present). The galaxy is a mixture model
         i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` and `collapse_cmps`

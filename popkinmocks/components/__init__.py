@@ -1,2 +1,2 @@
-from .growing_disk import growingDisk
-from .stream import stream
+from .growing_disk import GrowingDisk
+from .stream import Stream

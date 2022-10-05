@@ -1,31 +1,31 @@
 import numpy as np
 from scipy import stats, special
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from . import base
 
-class parametricComponent(base.baseComponent):
-    """Abstract base class to reprepsent parametrised galaxy components
+class ParametricComponent(base.Component):
+    """Abstract class to reprepsent *parametrised* galaxy components
 
-    Density factors as p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+    For these components the mass-weighted density factorises as
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
     - p(t) is a beta distribution,
     - p(x|t) is some parameterised function where the component has a specified
-    `center` and `rotation` relative to the cube. Sub-classes should implement
-    specific cases in their `set_p_x_t` method
-    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)). Sub-classes should implement
-    specific cases in their methods `set_mu_v` and `set_sig_v`
-    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e.
-    metallicity depends on a spatially varying depletion timescale t_dep(x). The
-    spcific form of mu_z(t,t_dep) and mu_z(t,t_dep) are taken from a chemical
-    evolution model from eqns 3-10 of Zhu, van de Venn, Leaman et al 2020
+    `center` and `rotation` relative to the cube. Sub-classes should prvoide
+    specific implementations in their `set_p_x_t` method,
+    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)). Sub-classes should provide
+    specific implementations in their `set_mu_v` and `set_sig_v` methods,
+    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
+    enrichment (i.e. metallicity vs t) depends on a spatially varying depletion
+    timescale t_dep(x). The functions mu_z(t,t_dep) and sig_z(t,t_dep) are taken
+    from equations 3-10 of Zhu, van de Venn, Leaman et al 20. Sub-classes should
+    provide specific implementations in `set_t_dep` method.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
         rotation: angle (radians) between x-axes of component and cube.
-        v_edg (array): velocity bin edges used to evaluate densities.
 
     """
-
     def __init__(self,
                  cube=None,
                  center=(0,0),
@@ -45,7 +45,6 @@ class parametricComponent(base.baseComponent):
         self.xxp = xxyy_prime[:,:,0]
         self.yyp = xxyy_prime[:,:,1]
         self.get_z_interpolation_grid()
-        self.v_edg = cube.v_edg
 
     def get_beta_a_b_from_lmd_phi(self, lmd, phi):
         """Convert from (total, mean) to (a,b) parameters of beta distribution
@@ -65,14 +64,14 @@ class parametricComponent(base.baseComponent):
     def linear_interpolate_t(self,
                              f_end,
                              f_start):
-        """Linearly interpolate f against time, given boundary values
+        """Linearly interpolate f against t given boundary [f_start, f_end]
 
         Args:
             f_end: value of f at end of disk build up i.e. more recently
             f_start: value of f at start of disk build up i.e. more in the past
 
         Returns:
-            array: f interpolated in age-bins of SSP models, set to constant
+            array: f interpolated to the t array of SSP models, set to constant
             values outside start/end times
 
         """
@@ -106,7 +105,8 @@ class parametricComponent(base.baseComponent):
 
         """
         a, b = self.get_beta_a_b_from_lmd_phi(lmd, phi)
-        assert (a>1.)+(b>1) >= 1, "SFH is bimodal: increase lmd?'"
+        if (a>1.)+(b>1) < 1:
+            raise ValueError("SFH is bimodal - increase lmd?'")
         age_bin_edges = self.cube.ssps.par_edges[1]
         age_loc = age_bin_edges[0]
         age_scale = age_bin_edges[-1] - age_bin_edges[0]
@@ -129,6 +129,14 @@ class parametricComponent(base.baseComponent):
                            idx_start_end=idx_start_end,
                            dt=dt)
         self.p_t = p_t
+
+    @abstractmethod
+    def set_p_x_t(self):
+        """Set the age dependent spatial density p(x|t)
+
+        Should set an attribute `self.p_x_t`, a 3D array of size [nx1, nx2, nt]
+        """
+        pass
 
     def get_p_x_t(self, density=True, light_weighted=False):
         """Get p(x|t)
@@ -189,7 +197,7 @@ class parametricComponent(base.baseComponent):
         """
         na = np.newaxis
         if light_weighted is False:
-            v_edg = self.v_edg[:, na, na, na]
+            v_edg = self.cube.v_edg[:, na, na, na]
             norm = stats.norm(loc=self.mu_v, scale=self.sig_v)
             p_v_tx = norm.cdf(v_edg[1:]) - norm.cdf(v_edg[:-1])
             if density is True:
@@ -198,7 +206,7 @@ class parametricComponent(base.baseComponent):
         else:
             p_tvxz = self.get_p_tvxz(density=True, light_weighted=True)
             if density is False:
-                dv = self.v_edg[1:] - self.v_edg[:-1]
+                dv = self.cube.v_edg[1:] - self.cube.v_edg[:-1]
                 dv = dv[na, :, na, na, na]
                 p_tvxz = p_tvxz*dv
             ssps = self.cube.ssps
@@ -252,8 +260,8 @@ class parametricComponent(base.baseComponent):
     def set_t_dep(self):
         """Set spatially varying depletion timescale
 
-        Should set an attribute `self.t_dep` - a 2D array of depletion time at
-        2D position
+        Should set an attribute `self.t_dep`, a 2D array of depletion time at 2D
+        position, of size [nx1, nx2]
 
         """
         pass
@@ -263,7 +271,7 @@ class parametricComponent(base.baseComponent):
 
         Evaluates the chemical evolution model defined in equations 3-10 of
         Zhu et al 2020, parameterised by a spatially varying depletion
-        timescale stored by `set_t_dep`.
+        timescale created by `set_t_dep`.
 
         """
         del_t_dep = self.t_dep[:,:,np.newaxis] - self.z_t_interp_grid['t_dep']
@@ -315,7 +323,7 @@ class parametricComponent(base.baseComponent):
         return p_z_tx
 
     def evaluate_ybar(self):
-        """Evaluate the noise-free data-cube
+        """Evaluate the datacube for this component
 
         Evaluate the integral
         ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz

@@ -1,18 +1,23 @@
 import numpy as np
-from scipy import stats, special
+from scipy import stats
 from . import parametric
 
-class stream(parametric.parametricComponent):
-    """A stream with spatially varying kinematics but uniform enrichment.
+class Stream(parametric.ParametricComponent):
+    """A stream component with spatially varying kinematics but spatially uniform enrichment
 
     The (mass-weighted) joint density of this component can be factorised as
     p(t,x,v,z) = p(t) p(x) p(v|x) p(z|t)
     where the factors are given by:
     - p(t) : a beta distribution (see `set_p_t`),
     - p(x) : a curved line with constant thickness (see `set_p_x`),
-    - p(v|x) : Guassian with mean varying along stream and constant sigma (see
-    set_p_v_x`),
+    - p(v|x) = Normal(v ; mu_v(x), sig_v(x)) where mean varies linearly along
+    stream angle (see `set_mu_v`) and dispersion is constant (see `set_sig_v`)
     - p(z|t) : single chemical evolution track i.. `t_dep` (see `set_p_z_t`).
+    - p(z|t) = Normal(z ; mu_z(t, t_dep), sig_z(t, t_dep) i.e. chemical
+    enrichment (i.e. metallicity vs t) depends on a single, spatially constant
+    depletion timescale t_dep (see `set_t_dep`). The functions mu_z(t,t_dep) and
+    sig_z(t,t_dep) are taken from equations 3-10 of Zhu, van de Venn, Leaman et
+    al 20.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -30,8 +35,8 @@ class stream(parametric.parametricComponent):
         """Define the stream track p(x)
 
         Defined in polar co-ordinates (theta,r). Stream extends between angles
-        `theta_lims` between radii in `mu_r_lims`. Density is constant along
-        with varying theta. The track has a constant width on the sky, `sig`.
+        `theta_lims` between radii in `mu_r_lims`. Density is constant with
+        varying theta. The track has a constant width on the sky, `sig`.
 
         Args:
             theta_lims: (start, end) values of stream angle in radians. Must be
@@ -39,7 +44,8 @@ class stream(parametric.parametricComponent):
             instantiating the stream component.
             mu_r_lims: (start, end) values of stream distance from center.
             sig (float): stream thickness.
-            nsmp (int): number of points to sample the angle theta.
+            nsmp (int): number of points to sample the angle theta (increase if
+                stream looks discretised.
 
         Returns:
             type: Description of returned object.
@@ -86,7 +92,6 @@ class stream(parametric.parametricComponent):
 
         Args:
             mu_v_lims: (start, end) values of stream velocity
-            sig_v (float): constant std dev of velocity distribution
 
         """
         th = np.arctan2(self.yyp, self.xxp)
