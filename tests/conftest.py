@@ -3,13 +3,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 import popkinmocks as pkm
 
-def my_component():
+def my_cube(nv=20):
+    v_edg = np.linspace(-900, 900, nv)
     ssps = pkm.model_grids.milesSSPs()
-    ssps.logarithmically_resample(dv=100.)
+    ssps.logarithmically_resample(dv=v_edg[1]-v_edg[0])
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    v_edg = np.linspace(-900, 900, 20)
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
+    return cube
+
+def my_component(nv=20):
+    cube = my_cube(nv=nv)
     gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0,0))
     gc1.set_p_t(lmd=2., phi=0.8)
     gc1.set_p_x_t(q_lims=(0.05, 0.5),
@@ -28,19 +32,14 @@ def my_component():
                   sig_v_in_lims=(70., 50.),
                   sig_v_out_lims=(80., 60.))
     gc1.evaluate_ybar()
-    return ssps, cube, gc1
+    return cube, gc1
 
 @pytest.fixture(scope="module", name='my_component')
 def my_component_fixture():
     return my_component()
 
-def my_second_component():
-    ssps = pkm.model_grids.milesSSPs()
-    ssps.logarithmically_resample(dv=100.)
-    ssps.calculate_fourier_transform()
-    ssps.get_light_weights()
-    v_edg = np.linspace(-900, 900, 20)
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
+def my_second_component(nv=20):
+    cube = my_cube(nv=nv)
     gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
@@ -67,13 +66,8 @@ def my_second_component():
 def my_second_component_fixture():
     return my_second_component()
 
-def my_stream_component():
-    ssps = pkm.model_grids.milesSSPs()
-    ssps.logarithmically_resample(dv=100.)
-    ssps.calculate_fourier_transform()
-    ssps.get_light_weights()
-    v_edg = np.linspace(-900, 900, 20)
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
+def my_stream_component(nv=20):
+    cube = my_cube(nv=nv)
     stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
     stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
@@ -85,19 +79,20 @@ def my_stream_component():
     stream.set_mu_v(mu_v_lims=[-100,100])
     stream.set_sig_v(sig_v=110.)
     stream.evaluate_ybar()
-    return ssps, cube, stream
+    return cube, stream
 
 @pytest.fixture(scope="module", name='my_stream_component')
 def my_stream_component_fixture():
     return my_stream_component()
 
-@pytest.fixture(scope="module", name="my_three_component_cube")
-def my_three_component_cube_fixture(
-    my_component,
-    my_second_component,
-    my_stream_component):
-    ssps, cube, gc1 = my_component
-    gc2 = my_second_component
-    ssps, cube, stream = my_stream_component
+def my_three_component_cube(nv=20):
+    cube, gc1 = my_component(nv=nv)
+    gc2 = my_second_component(nv=nv)
+    cube, stream = my_stream_component(nv=nv)
     cube.combine_components([gc1, gc2, stream], [0.65, 0.25, 0.1])
+    return cube
+
+@pytest.fixture(scope="module", name="my_three_component_cube")
+def my_three_component_cube_fixture():
+    cube = my_three_component_cube()
     return cube

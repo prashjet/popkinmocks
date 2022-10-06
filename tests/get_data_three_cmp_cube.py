@@ -12,10 +12,7 @@ def get_data_three_component_cube_ybar(cube):
     print('')
 
 get_data_three_component_cube_ybar(
-    my_three_component_cube(
-        my_component,
-        my_second_component,
-        my_stream_component)
+    my_three_component_cube()
     )
 
 # end

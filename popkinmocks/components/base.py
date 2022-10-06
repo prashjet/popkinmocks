@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy import interpolate
 
 class Component(object):
     """A galaxy component
@@ -11,16 +11,18 @@ class Component(object):
 
     Args:
         cube: a pkm.mock_cube.mockCube.
-        p_txvz (array): the 5D density p(t,x1,x2,v,z)
+        p_txvz (array): the 5D mass-weighted probabilty density p(t,x1,x2,v,z)
 
     """
-    def __init__(self, cube=None, p_txvz=None):
+    def __init__(self, cube=None, p_tvxz=None):
         self.cube = cube
         dtvxz = self.construct_volume_element('tvxz')
-        if p_txvz.shape==dtvxz.shape:
-            self.p_txvz = p_txvz
+        if p_tvxz.shape==dtvxz.shape:
+            self.p_tvxz = p_tvxz
         else:
-            raise ValueError(f'`p_txvz` must have shape {dtvxz.shape}')
+            err = f'`p_tvxz` has shape {p_tvxz.shape} '
+            err += f'but should have shape {dtvxz.shape}'
+            raise ValueError(err)
 
     def get_p(self,
               which_dist,
@@ -169,9 +171,9 @@ class Component(object):
                 v_edg = self.cube.v_edg
                 da = v_edg[1:] - v_edg[:-1]
             elif var=='x':
-                da = np.array([self.dx])
+                da = np.full(self.cube.nx, self.cube.dx)
             elif var=='y':
-                da = np.array([self.dy])
+                da = np.full(self.cube.ny, self.cube.dy)
             elif var=='z':
                 da = self.cube.ssps.delta_z
             idx = tuple([na for i in range(count)])
@@ -291,7 +293,7 @@ class Component(object):
             # correct uniform spacing
             check1 = np.allclose(v_edg[1:]-v_edg[:-1], ssps.dv)
             if not check1:
-                error_string += '(i) uniformly spaced'
+                error_string += '(i) uniformly spaced with dv = SSP resolution'
             # ascending
             v = (v_edg[:-1]+v_edg[1:])/2.
             check2 = np.all(np.sort(v)==v)
@@ -317,7 +319,8 @@ class Component(object):
         F_s_w_tz = np.moveaxis(F_s_w_tz, -1, 0)
         F_s_w_tz = F_s_w_tz[:,:,na,na,:]
         # move v=0 to correct position for the FFT
-        p_tvxz = self.get_p_tvxz(v_edg=v_edg, density=True)
+        p_tvxz = self.get_p_tvxz(density=True)
+        v = (v_edg[:-1]+v_edg[1:])/2.
         v0_idx = np.where(np.isclose(v, 0.))[0][0]
         p_tvxz = np.roll(p_tvxz, p_tvxz.shape[1]-v0_idx, axis=1)
         F_p_tvxz = np.fft.rfft(p_tvxz, axis=1) * ssps.dv
@@ -331,7 +334,7 @@ class Component(object):
         F_p_tvxz = interpolator(np.linspace(0, 1, F_s_w_tz.shape[1]))
         F_y = F_s_w_tz*F_p_tvxz
         y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
-        y = np.sum(y*dtz, (0,4)) * self.dx * self.dy
+        y = np.sum(y*dtz, (0,4)) * self.cube.dx * self.cube.dy
         self.ybar = y
 
     def get_p_t(self, density=True, light_weighted=False):
@@ -483,7 +486,7 @@ class Component(object):
         p_tvxz = self.p_tvxz
         if density is False:
             p_tvxz *= self.construct_volume_element('tvxz')
-        return p_txz
+        return p_tvxz
 
     def get_p_v(self, density=True, light_weighted=False):
         """Get p(v)

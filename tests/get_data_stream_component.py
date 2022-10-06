@@ -11,7 +11,7 @@ def test_component_ybar(
     """Checks value of ybar for one component
 
     """
-    ssps, cube, stream = my_stream_component()
+    cube, stream = my_stream_component()
     ybar_trim = stream.ybar[::150, ::2, ::2]
     print(repr(ybar_trim))
     print('')
