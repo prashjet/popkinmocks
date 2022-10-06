@@ -11,7 +11,7 @@ def get_data_component_kinematic_maps(
     """Checks Delta(mass_weighted kinematic maps- light weighted kinematic maps)
 
     """
-    ssps, cube, gc1 = my_component()
+    cube, gc1 = my_component()
     # check get_E_v_x
     a = gc1.get_E_v_x(light_weighted=False)
     b = gc1.get_E_v_x(light_weighted=True)
@@ -43,7 +43,7 @@ def get_data_component_ybar(
     """Checks value of ybar for one component
 
     """
-    ssps, cube, gc1 = my_component()
+    cube, gc1 = my_component()
     ybar_trim = gc1.ybar[::150, ::2, ::2]
     print(repr(ybar_trim))
     print('')

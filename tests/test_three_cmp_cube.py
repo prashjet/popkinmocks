@@ -5,76 +5,82 @@ import popkinmocks as pkm
 
 @pytest.fixture
 def my_ybar():
-    ybar = np.array(
-        [[[6.67893674e-07, 6.69360939e-07, 6.68723679e-07, 5.83209939e-07,
-         5.77660474e-07],
-        [8.83664446e-07, 1.08142032e-06, 1.09254773e-06, 9.93580918e-07,
-         1.07570487e-06],
-        [9.23129628e-07, 1.15894174e-06, 1.71553067e-06, 1.57071179e-06,
-         9.68483947e-07]],
+    ybar = np.array([[[6.61713225e-07, 6.57574889e-07, 6.65988628e-07, 5.80388448e-07,
+         5.66542885e-07],
+        [8.81048640e-07, 1.07286117e-06, 1.08458991e-06, 9.79574342e-07,
+         1.07375293e-06],
+        [9.23120707e-07, 1.15513879e-06, 1.72492828e-06, 1.57798473e-06,
+         9.68661650e-07]],
 
-       [[4.55575326e-07, 5.72636577e-07, 7.34388803e-07, 6.53639763e-07,
-         5.17491328e-07],
-        [5.23379075e-07, 7.24404447e-07, 1.11094830e-06, 8.57189741e-07,
-         7.84064166e-07],
-        [4.75548554e-07, 6.12731175e-07, 1.15137349e-06, 9.49152442e-07,
-         5.31339544e-07]],
+       [[6.72685245e-07, 7.97262398e-07, 9.34860013e-07, 8.44367565e-07,
+         7.12474108e-07],
+        [8.10178467e-07, 1.07905773e-06, 1.45876887e-06, 1.18866128e-06,
+         1.11394096e-06],
+        [7.83185408e-07, 9.98325611e-07, 1.59430946e-06, 1.44247527e-06,
+         8.45613580e-07]],
 
-       [[6.83558330e-07, 8.01792905e-07, 9.40077103e-07, 8.43452419e-07,
-         7.15387143e-07],
-        [8.29681307e-07, 1.09696934e-06, 1.45891961e-06, 1.19381156e-06,
-         1.10976965e-06],
-        [8.09503515e-07, 1.03606112e-06, 1.63142567e-06, 1.45142178e-06,
-         8.68811094e-07]],
+       [[6.54917834e-07, 7.71838363e-07, 9.30504260e-07, 8.29908338e-07,
+         6.87430769e-07],
+        [7.98975527e-07, 1.05487889e-06, 1.43256327e-06, 1.15121472e-06,
+         1.06968925e-06],
+        [7.92998778e-07, 1.03560683e-06, 1.64769224e-06, 1.43153722e-06,
+         8.42853110e-07]],
 
-       [[6.24897480e-07, 7.40651866e-07, 8.83779990e-07, 7.83337191e-07,
-         6.60060000e-07],
-        [7.53447161e-07, 1.00145818e-06, 1.35525034e-06, 1.09919041e-06,
-         1.02187853e-06],
-        [7.34024910e-07, 9.51035865e-07, 1.54221037e-06, 1.33882259e-06,
-         7.88247813e-07]],
+       [[5.42068761e-07, 6.52938174e-07, 8.06288595e-07, 7.26663426e-07,
+         5.84775769e-07],
+        [6.54617933e-07, 8.73399565e-07, 1.23631450e-06, 9.76035331e-07,
+         8.88786050e-07],
+        [6.47364760e-07, 8.59070326e-07, 1.38525422e-06, 1.17226996e-06,
+         6.87316724e-07]],
 
-       [[5.93968817e-07, 7.11348997e-07, 8.94762578e-07, 7.82693784e-07,
-         6.32864908e-07],
-        [7.19091297e-07, 9.55536656e-07, 1.34966887e-06, 1.06003987e-06,
-         9.94866481e-07],
-        [7.15776352e-07, 9.49319357e-07, 1.59209168e-06, 1.34337166e-06,
-         7.61759607e-07]],
+       [[6.43073563e-07, 7.62811990e-07, 9.20152213e-07, 8.17782904e-07,
+         6.79471304e-07],
+        [7.76794039e-07, 1.03094537e-06, 1.41220556e-06, 1.13622595e-06,
+         1.07719171e-06],
+        [7.61254032e-07, 9.83670960e-07, 1.61590061e-06, 1.43060941e-06,
+         8.18186769e-07]],
 
-       [[6.13042484e-07, 7.33139880e-07, 8.91379549e-07, 7.90116482e-07,
-         6.53904675e-07],
-        [7.34665009e-07, 9.80953392e-07, 1.36428436e-06, 1.09129622e-06,
-         1.04115480e-06],
-        [7.14785204e-07, 9.28993523e-07, 1.57620235e-06, 1.36950164e-06,
-         7.72121085e-07]],
+       [[6.04675017e-07, 7.19325954e-07, 8.61208500e-07, 7.62702523e-07,
+         6.41031564e-07],
+        [7.23708549e-07, 9.65884288e-07, 1.32236775e-06, 1.06790917e-06,
+         1.02270638e-06],
+        [6.98821914e-07, 9.05081454e-07, 1.53962782e-06, 1.33498974e-06,
+         7.57222728e-07]],
 
-       [[5.90161883e-07, 7.04946526e-07, 8.59582574e-07, 7.58021399e-07,
-         6.27472646e-07],
-        [7.06923570e-07, 9.43099299e-07, 1.31184921e-06, 1.04784861e-06,
-         1.00945780e-06],
-        [6.88624051e-07, 8.97063938e-07, 1.54374203e-06, 1.33591919e-06,
-         7.44589270e-07]],
+       [[5.86219763e-07, 7.01686121e-07, 8.51797124e-07, 7.55149111e-07,
+         6.25688041e-07],
+        [7.00838870e-07, 9.36882542e-07, 1.30358950e-06, 1.04354573e-06,
+         1.00505071e-06],
+        [6.79601034e-07, 8.83204006e-07, 1.52000681e-06, 1.31914071e-06,
+         7.36179282e-07]],
 
-       [[5.56292526e-07, 6.61151295e-07, 8.08697513e-07, 7.13126159e-07,
-         5.87420168e-07],
-        [6.70943574e-07, 8.90973256e-07, 1.23563582e-06, 9.84804192e-07,
-         9.57950782e-07],
-        [6.60440692e-07, 8.56415215e-07, 1.46089648e-06, 1.28422147e-06,
-         7.11763704e-07]],
+       [[5.69584411e-07, 6.77191608e-07, 8.24564230e-07, 7.26459816e-07,
+         6.02284883e-07],
+        [6.84098294e-07, 9.10551274e-07, 1.25921867e-06, 1.00749437e-06,
+         9.81479728e-07],
+        [6.66440450e-07, 8.61552365e-07, 1.48532965e-06, 1.30082578e-06,
+         7.21705197e-07]],
 
-       [[5.05472788e-07, 6.02644776e-07, 7.60949613e-07, 6.63803978e-07,
-         5.34259647e-07],
-        [6.12066608e-07, 8.10379986e-07, 1.14871956e-06, 8.97749518e-07,
-         8.75354882e-07],
-        [6.11906523e-07, 8.02299580e-07, 1.37974925e-06, 1.19452173e-06,
-         6.54556964e-07]],
+       [[5.57874569e-07, 6.68602709e-07, 8.16771476e-07, 7.21082053e-07,
+         5.95468641e-07],
+        [6.66473462e-07, 8.90707181e-07, 1.24548298e-06, 9.94209672e-07,
+         9.73011598e-07],
+        [6.48459882e-07, 8.40786647e-07, 1.47100058e-06, 1.28749358e-06,
+         7.03598859e-07]],
 
-       [[4.94510108e-07, 5.94451647e-07, 7.42040563e-07, 6.50050280e-07,
-         5.28070354e-07],
-        [5.91601623e-07, 7.89536028e-07, 1.12102144e-06, 8.83428319e-07,
-         8.63092741e-07],
-        [5.82139251e-07, 7.62962658e-07, 1.34501600e-06, 1.16043791e-06,
-         6.28687554e-07]]])
+       [[4.96223656e-07, 5.93474999e-07, 7.25214697e-07, 6.37540536e-07,
+         5.26883336e-07],
+        [5.94045967e-07, 7.92357013e-07, 1.10369132e-06, 8.80442521e-07,
+         8.62877733e-07],
+        [5.82960741e-07, 7.65077315e-07, 1.33393264e-06, 1.15744612e-06,
+         6.29391004e-07]],
+
+       [[5.16080343e-07, 6.15466495e-07, 7.39659427e-07, 6.52891835e-07,
+         5.48356640e-07],
+        [6.10495496e-07, 8.18189508e-07, 1.13128489e-06, 9.11922700e-07,
+         9.05655983e-07],
+        [5.79174974e-07, 7.40158390e-07, 1.33411939e-06, 1.16835043e-06,
+         6.38196302e-07]]])
 
 
     return ybar
@@ -86,7 +92,7 @@ def test_three_component_cube_normalisations(my_three_component_cube):
     """
     cube = my_three_component_cube
     ssps = cube.ssps
-    v_edg = np.linspace(-1000, 1000, 50)
+    v_edg = cube.v_edg
     dv = v_edg[1] - v_edg[0]
     na = np.newaxis
     # check p_t
@@ -175,52 +181,73 @@ def test_three_component_cube_normalisations(my_three_component_cube):
     a = cube.get_p('tz', density=True, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a*ssps.delta_t[:,na]*ssps.delta_z[na,:]), 1.)
     # # check get_p_vx
-    a = cube.get_p('vx', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('vx', density=False, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('vx', density=True, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv*cube.dx*cube.dy), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('vx', density=False, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a), 1.)
-    a = cube.get_p('vx', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('vx', density=True, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv*cube.dx*cube.dy), 1.)
     # check get_p_tvxz
-    a = cube.get_p('tvxz', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=False, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=True, light_weighted=False, collapse_cmps=True)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=False, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1)
-    a = cube.get_p('tvxz', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('tvxz', density=True, light_weighted=True, collapse_cmps=True)
     vol_elmt = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
     vol_elmt *= cube.dx * cube.dy * dv
     assert np.isclose(np.sum(a*vol_elmt), 1)
     # check get_p_v_x
-    a = cube.get_p('v_x', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v_x', density=False, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v_x', density=True, light_weighted=False, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v_x', density=False, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a, 0), 1.)
-    a = cube.get_p('v_x', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v_x', density=True, light_weighted=True, collapse_cmps=True)
     assert np.allclose(np.sum(a*dv, 0), 1.)
     # check get_p_v
-    a = cube.get_p('v', v_edg=v_edg, density=False, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v', density=False, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=True, light_weighted=False, collapse_cmps=True)
+    a = cube.get_p('v', density=True, light_weighted=False, collapse_cmps=True)
     assert np.isclose(np.sum(a*dv), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=False, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v', density=False, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a), 1.)
-    a = cube.get_p('v', v_edg=v_edg, density=True, light_weighted=True, collapse_cmps=True)
+    a = cube.get_p('v', density=True, light_weighted=True, collapse_cmps=True)
     assert np.isclose(np.sum(a*dv), 1.)
 
 
 def test_three_component_cube_ybar(my_three_component_cube, my_ybar):
     cube = my_three_component_cube
     ybar = my_ybar
-    print(ybar.shape)
     assert np.allclose(cube.ybar[::100,::3,::2], ybar)
+
+
+def test_datacube_exact_fts_vs_ffts(my_three_component_cube, my_ybar):
+    cube = my_three_component_cube
+    ybar = my_ybar
+    p_tvxz = cube.get_p('tvxz',
+                        density=True,
+                        light_weighted=False,
+                        collapse_cmps=True)
+    mix_cmp = pkm.components.Component(cube=cube, p_tvxz=p_tvxz)
+    mix_cmp.evaluate_ybar()
+    frac_error = (mix_cmp.ybar[::100,::3,::2] - ybar)/ybar
+    # check median absolute error < 0.15 %
+    # this choice is justified in `error_limit_exactFTs_vs_FFTs.ipynb`
+    mad = np.median(np.abs(frac_error))
+    assert mad<0.0015
+
+
+
+
+
+
 
 
 # end
