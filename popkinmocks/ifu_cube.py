@@ -361,74 +361,187 @@ class IFUCube(object):
         dvol = dvol[idx]
         return dvol
 
-    def get_E_v_x(self):
-        """Get the mean of the mixture-galaxy velocity map
-
-        Returns:
-            array
-
-        """
-        mu_i = np.array([cmp.get_E_v_x() for cmp in self.component_list])
-        p_x_i = np.array([cmp.get_p_x(density=True) for cmp in self.component_list])
-        E_v_x = np.sum(self.weights * p_x_i.T * mu_i.T, -1).T
-        return E_v_x
-
-    def get_jth_central_moment_v_x(self, j):
-        """Get j'th central moment of the mixture-galaxy velocity map
+    def get_variable_values(self, which_variable):
+        """Get values of the variable v, x1, x2, t or z.
 
         Args:
-            j (int): which moment
+            which_variable (string): which variable, one of v, x1, x2, t or z.
 
         Returns:
-            array
+            array: the discretisation values used for this variable
 
         """
-        mu = self.get_E_v_x()
+        if which_variable == 't':
+            var = self.ssps.par_cents[1]
+        elif which_variable == 'v':
+            v_edg = self.v_edg
+            var = (v_edg[:-1] + v_edg[1:])/2.
+        elif which_variable == 'z':
+            var = self.ssps.par_cents[0]
+        elif which_variable == 'x1':
+            var = self.x
+        elif which_variable == 'x2':
+            var = self.y
+        else:
+            raise ValueError('Unknown variable')
+        return var
+
+    def get_mean(self, which_dist, light_weighted=False):
+        """Get mean or conditional mean of a 1D distribution
+
+        The `which_dist` string specifies which distribution to mean. If
+        `which_dist` contains no underscore, this returns the mean of the
+        appropriate marginal distribution e.g.
+        - `which_dist = 'v'` returns E(v) = int v p(v) dv
+        If `which_dist` contains an underscore, this returns the mean of the
+        appropriate conditional distribution e.g.
+        - `which_dist = 'v_x'` returns E(v|x) = int v p(v|x) dv
+        Only works for distributions of one argument i.e. one variable before
+        the underscore in `which_dist`.
+        Uses exact calculations if available for a given distribution.
+
+        Args:
+            which_dist (string): which distribution to mean. See full docstring.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: if the variable to mean is t, v or z, returns an array
+                with shape equal to the shape of the conditioners e.g.
+                `which_dist = 'v_tz'` returns array shape (nt, nz)
+                and a float if conditional. For x, the returned array has extra
+                initial dimension of size 2 for the 2 spatial dimensions.
+
+        """
+        mu_i = np.array([
+            cmp.get_mean(which_dist, light_weighted=light_weighted)
+            for cmp in self.component_list])
+        mean = np.sum(self.weights * mu_i.T, -1).T
+        return mean
+
+    def get_central_moment(self, which_dist, j, light_weighted=False):
+        """Get central moment or conditional central moment of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output. Uses exact calculations if available for a given
+        distribution/component.
+
+        Args:
+            which_dist (string): which distribution to take central moment of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the central moment or conditional central moment
+
+        """
+        mu = self.get_mean(which_dist, light_weighted=light_weighted)
         k = np.arange(0, j+1, 1)
         j_choose_k = special.comb(j, k)
-        na = np.newaxis
-        muj_v_x = np.zeros_like(mu)
+        moment = np.zeros_like(mu)
         for cmp_i, w_i in zip(self.component_list, self.weights):
-            mu_i = cmp_i.get_E_v_x()
-            muk_i = np.array([cmp_i.get_jth_central_moment_v_x(k0) for k0 in k])
-            delta_mu_to_the_j_minus_k = (mu_i - mu)[na,:,:]**(j-k)[:,na,na]
-            muj_i = w_i * np.sum(delta_mu_to_the_j_minus_k * muk_i, 0)
-            muj_v_x += muj_i
-        return muj_v_x
+            mu_i = cmp_i.get_mean(which_dist, light_weighted=light_weighted)
+            muk_i = np.array([cmp_i.get_central_moment(
+                which_dist,
+                k0,
+                light_weighted=light_weighted) for k0 in k])
+            j_minus_k = np.broadcast_to(j-k, mu.shape+(j+1,))
+            j_minus_k = np.moveaxis(j_minus_k, -1, 0)
+            moment += w_i * np.sum((mu_i-mu)**j_minus_k * muk_i, 0)
+        return moment
 
-    def get_variance_v_x(self):
-        """Get variance of the mixture-galaxy velocity map
+    def get_variance(self, which_dist, light_weighted=False):
+        """Get variance or conditional variance of a 1D distribution
 
-        Returns:
-            array
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output.
 
-        """
-        var_v_x = self.get_jth_central_moment_v_x(2)
-        return var_v_x
-
-    def get_skewness_v_x(self):
-        """Get skewness of the mixture-galaxy velocity map
-
-        Returns:
-            array
-
-        """
-        mu3_v_x = self.get_jth_central_moment_v_x(3)
-        var_v_x = self.get_jth_central_moment_v_x(2)
-        skewness_v_x = mu3_v_x/var_v_x**1.5
-        return skewness_v_x
-
-    def get_kurtosis_v_x(self):
-        """Get kurtosis of the mixture-galaxy velocity map
+        Args:
+            which_dist (string): which distribution to take variance of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
 
         Returns:
-            array
+            float/array: the variance or conditional variance
 
         """
-        mu4_v_x = self.get_jth_central_moment_v_x(4)
-        var_v_x = self.get_jth_central_moment_v_x(2)
-        kurtosis_v_x = mu4_v_x/var_v_x**2.
-        return kurtosis_v_x
+        variance = self.get_central_moment(
+            which_dist,
+            2,
+            light_weighted=light_weighted)
+        return variance
+
+    def get_skewness(self, which_dist, light_weighted=False):
+        """Get skewness or conditional skewness of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output.
+
+        Args:
+            which_dist (string): which distribution to take skewness of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the variance or conditional skewness
+
+        """
+        mu_3 = self.get_central_moment(
+            which_dist,
+            3,
+            light_weighted=light_weighted)
+        variance = self.get_central_moment(
+            which_dist,
+            2,
+            light_weighted=light_weighted)
+        skewness = mu_3/variance**1.5
+        return skewness
+
+    def get_kurtosis(self, which_dist, light_weighted=False):
+        """Get kurtosis or conditional kurtosis of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output.
+
+        Args:
+            which_dist (string): which distribution to take kurtosis of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the kurtosis or conditional kurtosis
+
+        """
+        mu_4 = self.get_central_moment(
+            which_dist,
+            4,
+            light_weighted=light_weighted)
+        variance = self.get_central_moment(
+            which_dist,
+            2,
+            light_weighted=light_weighted)
+        kurtosis = mu_4/variance**2.
+        return kurtosis
+
+    def get_excess_kurtosis(self, which_dist, light_weighted=False):
+        """Get excess kurtosis or conditional ex-kurtosis of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output.
+
+        Args:
+            which_dist (string): which distribution to take ex-kurtosis of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the ex-kurtosis or conditional ex-kurtosis
+
+        """
+        kurtosis = self.get_kurtosis(
+            which_dist,
+            light_weighted=light_weighted)
+        return kurtosis - 3.
 
     def imshow(self,
                img,

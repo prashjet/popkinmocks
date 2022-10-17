@@ -4,7 +4,8 @@ import numpy as np
 import popkinmocks as pkm
 
 def my_cube(nv=20):
-    v_edg = np.linspace(-900, 900, nv)
+    vlim = 900
+    v_edg = np.linspace(-vlim, vlim, nv)
     ssps = pkm.model_grids.milesSSPs()
     ssps.logarithmically_resample(dv=v_edg[1]-v_edg[0])
     ssps.calculate_fourier_transform()
@@ -12,7 +13,7 @@ def my_cube(nv=20):
     cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
     return cube
 
-def my_component(nv=20):
+def my_component(nv=20, eval_ybar=True):
     cube = my_cube(nv=nv)
     gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0,0))
     gc1.set_p_t(lmd=2., phi=0.8)
@@ -31,14 +32,15 @@ def my_component(nv=20):
                   alpha_lims=(3.0, 2.5),
                   sig_v_in_lims=(70., 50.),
                   sig_v_out_lims=(80., 60.))
-    gc1.evaluate_ybar()
+    if eval_ybar:
+        gc1.evaluate_ybar()
     return cube, gc1
 
 @pytest.fixture(scope="module", name='my_component')
 def my_component_fixture():
     return my_component()
 
-def my_second_component(nv=20):
+def my_second_component(nv=20, eval_ybar=True):
     cube = my_cube(nv=nv)
     gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
@@ -59,14 +61,15 @@ def my_second_component(nv=20):
                   alpha_lims=(2.0, 1.5),
                   sig_v_in_lims=(70., 90.),
                   sig_v_out_lims=(10., 20.))
-    gc2.evaluate_ybar()
+    if eval_ybar:
+        gc2.evaluate_ybar()
     return gc2
 
 @pytest.fixture(scope="module", name='my_second_component')
 def my_second_component_fixture():
     return my_second_component()
 
-def my_stream_component(nv=20):
+def my_stream_component(nv=20, eval_ybar=True):
     cube = my_cube(nv=nv)
     stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
@@ -78,17 +81,18 @@ def my_stream_component(nv=20):
     stream.set_p_z_tx()
     stream.set_mu_v(mu_v_lims=[-100,100])
     stream.set_sig_v(sig_v=110.)
-    stream.evaluate_ybar()
+    if eval_ybar:
+        stream.evaluate_ybar()
     return cube, stream
 
 @pytest.fixture(scope="module", name='my_stream_component')
 def my_stream_component_fixture():
     return my_stream_component()
 
-def my_three_component_cube(nv=20):
-    cube, gc1 = my_component(nv=nv)
-    gc2 = my_second_component(nv=nv)
-    cube, stream = my_stream_component(nv=nv)
+def my_three_component_cube(nv=20, eval_ybar=True):
+    cube, gc1 = my_component(nv=nv, eval_ybar=eval_ybar)
+    gc2 = my_second_component(nv=nv, eval_ybar=eval_ybar)
+    cube, stream = my_stream_component(nv=nv, eval_ybar=eval_ybar)
     cube.combine_components([gc1, gc2, stream], [0.65, 0.25, 0.1])
     return cube
 

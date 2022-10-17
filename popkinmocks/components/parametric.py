@@ -697,10 +697,12 @@ class ParametricComponent(base.Component):
                 p_z = np.sum(p_tz*delta_t, 0)
         return p_z
 
-    def get_E_v_x(self, light_weighted=False):
-        """Get mean velocity map E[p(v|x)]
+    def get_p_v_x(self, density=True, light_weighted=False):
+        """Get p(v|x)
 
         Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
             mass-weighted (False) quantity
 
@@ -708,37 +710,378 @@ class ParametricComponent(base.Component):
             array
 
         """
-        P_t = self.get_p_t(density=False, light_weighted=light_weighted)
-        E_v_x = np.sum((P_t*self.mu_v.T).T, 0)
+        if light_weighted:
+            raise NotImplementedError
+        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+        P_t = self.get_p_t(density=False, light_weighted=False)
+        na = np.newaxis
+        p_v_x = np.sum((p_v_tx.T * P_t[na].T).T, 1)
+        return p_v_x
+
+    def get_p_v_t(self, density=True, light_weighted=False):
+        """Get p(v|t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        if light_weighted:
+            raise NotImplementedError
+        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+        P_x = self.get_p_x(density=False, light_weighted=False)
+        na = np.newaxis
+        p_v_t = np.sum((p_v_tx.T * P_x[na,na].T).T, (2,3))
+        return p_v_t
+
+    def get_p_z_x(self, density=True, light_weighted=False):
+        """Get p(z|x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        if light_weighted:
+            raise NotImplementedError
+        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
+        P_t = self.get_p_t(density=False, light_weighted=False)
+        na = np.newaxis
+        p_z_x = np.sum((p_z_tx.T * P_t[na].T).T, 1)
+        return p_z_x
+
+    def get_p_z_t(self, density=True, light_weighted=False):
+        """Get p(z|t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        if light_weighted:
+            raise NotImplementedError
+        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
+        P_x = self.get_p_x(density=False, light_weighted=False)
+        na = np.newaxis
+        p_z_t = np.sum((p_z_tx.T * P_x[na,na].T).T, (2,3))
+        return p_z_t
+
+    def get_central_moment_v_tx(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|t,x)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt, nx1, nx2)
+
+        """
+        if j%2 == 0:
+            return self.sig_v**j * special.factorial2(j-1)
+        else:
+            return np.zeros_like(self.sig_v)
+
+    def get_central_moment_v_x(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|x)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nx1, nx2)
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        E_v_x = self.get_mean_v_x(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        del_mu = E_v_tx - E_v_x
+        na = np.newaxis
+        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
+        Pt = self.get_p('t', light_weighted=light_weighted, density=False)
+        moment = np.sum(Pt * sum_over_k.T, -1).T
+        return moment
+
+    def get_central_moment_v_t(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|t)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt,)
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        E_v_t = self.get_mean_v_t(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        na = np.newaxis
+        del_mu = E_v_tx - E_v_t[:,na,na]
+        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
+        Px = self.get_p('x', light_weighted=light_weighted, density=False)
+        moment = np.sum(Px * sum_over_k, (-1,-2))
+        return moment
+
+    def get_central_moment_v(self, j, light_weighted=False):
+        """Get j'th central moment of p(v)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            float
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        E_v = self.get_mean_v(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        del_mu = E_v_tx - E_v
+        na = np.newaxis
+        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
+        Ptx = self.get_p('tx', light_weighted=light_weighted, density=False)
+        moment = np.sum(Ptx * sum_over_k)
+        return moment
+
+    def get_central_moment_v_txz(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|t,x,z)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt,nx1,nx2,nz)
+
+        """
+        moment_v_tx = self.get_central_moment_v_tx(
+            j,
+            light_weighted=light_weighted)
+        nz = self.cube.ssps.delta_z.shape[0]
+        moment_v_txz = np.broadcast_to(moment_v_tx, (nz,)+moment_v_tx.shape)
+        moment_v_txz = np.moveaxis(moment_v_txz, 0, -1)
+        return moment_v_txz
+
+    def get_central_moment_v_tz(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|t,z)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt,nz)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        E_v_tz = self.get_mean_v_tz(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        na = np.newaxis
+        del_mu = E_v_txz - E_v_tz[:,na,na,:]
+        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
+        Px = self.get_p('x', light_weighted=light_weighted, density=False)
+        moment = np.sum(Px * sum_over_k, (1,2))
+        return moment
+
+    def get_central_moment_v_xz(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|x,z)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nx1,nx2,nz)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        E_v_xz = self.get_mean_v_xz(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        del_mu = E_v_txz - E_v_xz
+        na = np.newaxis
+        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
+        Pt = self.get_p('t', light_weighted=light_weighted, density=False)
+        moment = np.sum(Pt * sum_over_k, 0)
+        return moment
+
+    def get_central_moment_v_z(self, j, light_weighted=False):
+        """Get j'th central moment of p(v|z)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nz,)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        E_v_z = self.get_mean_v_z(light_weighted=light_weighted)
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
+        normal_moments = np.array([
+            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
+            for k0 in k])
+        normal_moments = np.moveaxis(normal_moments, 0, -1)
+        del_mu = E_v_txz - E_v_xz
+        na = np.newaxis
+        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
+        Ptx = self.get_p('tx', light_weighted=light_weighted, density=False)
+        moment = np.sum(Ptx * sum_over_k, (0,1,2))
+        return moment
+
+    def get_mean_v_tx(self, light_weighted=False):
+        """Get conditional expectation E(v|t,x)
+
+        Returns:
+            array size (nt, nx1, nx2)
+
+        """
+        return self.mu_v # for both light weighted and mass weighted
+
+    def get_mean_v_x(self, light_weighted=False):
+        """Get conditional expectation E(v|x)
+
+        Returns:
+            array size (nx1, nx2)
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        P_t = self.get_p_t(light_weighted=light_weighted, density=False)
+        E_v_x = np.sum(E_v_tx.T*P_t, -1).T
         return E_v_x
 
-    def get_jth_central_moment_v_x(self, j, light_weighted=False):
-        """Get j'th central moment of velocity map E[p((v-mu_v)^j|x)]
-
-        Args:
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
+    def get_mean_v_t(self, light_weighted=False):
+        """Get conditional expectation E(v|t)
 
         Returns:
-            array
+            array size (nt,)
 
         """
-        P_t = self.get_p_t(density=False, light_weighted=light_weighted)
-        mu = self.get_E_v_x()
-        k = np.arange(0, j+1, 2)
-        tmp1 = special.comb(j, k)
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        P_x = self.get_p_x(light_weighted=light_weighted, density=False)
+        E_v_x = np.sum(E_v_tx*P_x, (1,2))
+        return E_v_x
+
+    def get_mean_v(self, light_weighted=False):
+        """Get expectation E(v)
+
+        Returns:
+            float
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        P_tx = self.get_p_tx(light_weighted=light_weighted, density=False)
+        E_v = np.sum(E_v_tx*P_tx)
+        return E_v
+
+    def get_mean_v_txz(self, light_weighted=False):
+        """Get conditional expectation E(v|t,x,z)
+
+        Returns:
+            array size (nt, nx1, nx2, nz)
+
+        """
+        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        nz = self.cube.ssps.delta_z.shape[0]
+        E_v_txz = np.broadcast_to(E_v_tx, (nz,)+E_v_tx.shape)
+        E_v_txz = np.moveaxis(E_v_txz, 0, -1)
+        return E_v_txz
+
+    def get_mean_v_tz(self, light_weighted=False):
+        """Get conditional expectation E(v|t,z)
+
+        Returns:
+            array size (nt, nz)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        P_x = self.get_p_x(light_weighted=light_weighted, density=False)
         na = np.newaxis
-        tmp2 = (self.mu_v - mu)[na,:,:,:]**(j-k[:,na,na,na])
-        tmp3 = 1.*P_t
-        tmp4 = self.sig_v[na,:,:,:]**k[:,na,na,na]
-        tmp5 = special.factorial2(k-1)
-        muj_v_x = np.einsum('k,ktxy,t,ktxy,k->xy',
-                            special.comb(j, k),
-                            (self.mu_v - mu)[na,:,:,:]**(j-k[:,na,na,na]),
-                            P_t,
-                            self.sig_v[na,:,:,:]**k[:,na,na,na],
-                            special.factorial2(k-1))
-        return muj_v_x
+        E_v_tz = np.sum(E_v_txz*P_x[na,:,:,na], (1,2))
+        return E_v_tz
+
+    def get_mean_v_xz(self, light_weighted=False):
+        """Get conditional expectation E(v|x,z)
+
+        Returns:
+            array size (nx1, nx2, nz)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        P_t = self.get_p_t(light_weighted=light_weighted, density=False)
+        na = np.newaxis
+        E_v_xz = np.sum(E_v_txz*P_t[:,na,na,na], 0)
+        return E_v_xz
+
+    def get_mean_v_z(self, light_weighted=False):
+        """Get conditional expectation E(v|z)
+
+        Returns:
+            array size (nz,)
+
+        """
+        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        P_tz = self.get_p_tz(light_weighted=light_weighted, density=False)
+        na = np.newaxis
+        E_v_z = np.sum(E_v_txz*P_tz[:,na,na,:], (0,1,2))
+        return E_v_z
 
     def plot_density(self,
                      vmin=0.1,

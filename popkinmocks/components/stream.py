@@ -76,7 +76,10 @@ class Stream(parametric.ParametricComponent):
                              mu_r_lims=mu_r_lims,
                              sig=sig,
                              nsmp=nsmp)
-        self.p_x_t = pdf[:,:,np.newaxis]
+        nt = len(self.cube.get_variable_values('t'))
+        pdf = np.broadcast_to(pdf, (nt,)+pdf.shape)
+        pdf = np.moveaxis(pdf, 0, -1)
+        self.p_x_t = pdf
 
     def set_t_dep(self, t_dep=3.):
         """Set constant depletion timescale
@@ -109,7 +112,9 @@ class Stream(parametric.ParametricComponent):
         mu_v[idx] = (th[idx]-min_th)/(max_th-min_th) * (mu_v_hi-mu_v_lo)
         mu_v[idx] += mu_v_lo
         self.mu_v_lims = mu_v_lims
-        self.mu_v = mu_v[np.newaxis,:,:]
+        nt = len(self.cube.get_variable_values('t'))
+        mu_v = np.broadcast_to(mu_v, (nt,)+mu_v.shape)
+        self.mu_v = mu_v
 
     def set_sig_v(self, sig_v=100.):
         """Set constant velocity dispersion
