@@ -144,7 +144,7 @@ class IFUCube(object):
               collapse_cmps=False,
               density=True,
               light_weighted=False):
-        """Evaluate population-kinematic distributions of multi-component galaxy
+        """Evaluate probability functions for a multi component galaxy
 
         Evaluate marginal or conditional densities over: stellar age t, 2D
         position x, velocity v and metallicity z. Argument `which_dist`
@@ -167,8 +167,52 @@ class IFUCube(object):
                 mass-weighted (False) quantity
 
         Returns:
-            array: the desired distribution. If `collapse_cmps=True`, then array
-                dimensions correspond to the order of variables as provided in
+            array: log of desired probability function. If `collapse_cmps=True`
+                array dimensions correspond to order of variables as provided in
+                `which_dist` string e.g. `which_dist = tz_x` returns p(t,z|x) as
+                a 4D array with dimensions corresponding to [t,z,x1,x2].
+                If `collapse_cmps=False` the zero'th dimension will index over
+                different galaxy components.
+
+        """
+        log_p = self.get_log_p(
+            which_dist,
+            collapse_cmps=collapse_cmps,
+            density=density,
+            light_weighted=light_weighted)
+        p = np.exp(log_p)
+        return p
+
+    def get_log_p(self,
+                  which_dist,
+                  collapse_cmps=False,
+                  density=True,
+                  light_weighted=False):
+        """Evaluate log probability functions for a multi component galaxy
+
+        Evaluate log marginal or conditional densities over: stellar age t, 2D
+        position x, velocity v and metallicity z. Argument `which_dist`
+        specifies which distribution to evaluate where underscore (if
+        present) represents conditioning e.g.
+        - `which_dist = 'tv'` --> p(t,v),
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
+        Variables in `which_dist` must be provided in alphabetical order (on
+        either side of the underscore if present). The galaxy is a mixture model
+        i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` and `collapse_cmps`
+        controls whether or not the density is collapsed over the components `i`
+
+        Args:
+            which_dist (string): which density to evaluate
+            collapse_cmps (bool): whether to collapse component densities
+                together (True) or leave them in-tact (False)
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            array: log of desired probability function. If `collapse_cmps=True`
+                array dimensions correspond to order of variables as provided in
                 `which_dist` string e.g. `which_dist = tz_x` returns p(t,z|x) as
                 a 4D array with dimensions corresponding to [t,z,x1,x2].
                 If `collapse_cmps=False` the zero'th dimension will index over
@@ -177,27 +221,27 @@ class IFUCube(object):
         """
         is_conditional = '_' in which_dist
         if is_conditional:
-            p = self.get_conditional_distribution(
+            log_p = self.get_log_conditional_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
         else:
             if light_weighted:
-                p = self.get_marginal_distribution_light_wtd(
+                log_p = self.get_log_marginal_distribution_light_wtd(
                     which_dist,
                     density=density)
             else:
-                p = self.get_marginal_distribution_mass_wtd(
+                log_p = self.get_log_marginal_distribution_mass_wtd(
                     which_dist,
                     density=density)
         if collapse_cmps:
-            p = np.sum(p, 0)
-        return p
+            log_p = special.logsumexp(log_p, 0)
+        return log_p
 
-    def get_marginal_distribution_mass_wtd(self,
-                                           which_dist,
-                                           density=True):
-        """Evaluate component-wise mass-weighted marginal distributions
+    def get_log_marginal_distribution_mass_wtd(self,
+                                               which_dist,
+                                               density=True):
+        """Evaluate component-wise mass-weighted log marginal distributions
 
         Args:
             which_dist (string): which density to evaluate (this must be
@@ -213,18 +257,19 @@ class IFUCube(object):
         count = 0
         zipped_cmp_wts = zip(self.component_list,self.weights)
         for i, (cmp, w) in enumerate(zipped_cmp_wts):
-            p_func = getattr(cmp, 'get_p_'+which_dist)
-            pi = w * p_func(density=density, light_weighted=False)
+            log_p_func = getattr(cmp, 'get_log_p_'+which_dist)
+            log_pi = np.log(w) + log_p_func(density=density,
+                                            light_weighted=False)
             if count == 0:
-                p = np.zeros((self.n_cmps,) + pi.shape)
-            p[i] = pi
+                log_p = np.zeros((self.n_cmps,) + log_pi.shape)
+            log_p[i] = log_pi
             count += 1
-        return p
+        return log_p
 
-    def get_marginal_distribution_light_wtd(self,
-                                            which_dist,
-                                            density=True):
-        """Evaluate component-wise light-weighted marginal distributions
+    def get_log_marginal_distribution_light_wtd(self,
+                                                which_dist,
+                                                density=True):
+        """Evaluate component-wise light-weighted log marginal distributions
 
         Args:
             which_dist (string): which density to evaluate (this must be
@@ -244,30 +289,31 @@ class IFUCube(object):
         else:
             current_dist = 'txz'
             lw = self.ssps.light_weights[na,:,na,na,:]
-        P_mw = self.get_marginal_distribution_mass_wtd(
+        log_P_mw = self.get_log_marginal_distribution_mass_wtd(
             current_dist,
             density=False)
-        P_lw = P_mw * lw
-        P_lw /= np.sum(P_lw)
+        log_P_lw = log_P_mw + np.log(lw)
+        log_normalisation = special.logsumexp(log_P_lw)
+        log_P_lw -= log_normalisation
         # sum over any variables not in the desired distribution
         if 't' not in which_dist:
-            P_lw = np.sum(P_lw, 1)
+            log_P_lw = special.logsumexp(log_P_lw, 1)
         # don't swap the order of these next two operations!
         if 'x' not in which_dist:
-            P_lw = np.sum(P_lw, (-3,-2))
+            log_P_lw = special.logsumexp(log_P_lw, (-3,-2))
         if 'z' not in which_dist:
-            P_lw = np.sum(P_lw, -1)
+            log_P_lw = special.logsumexp(log_P_lw, -1)
         if density:
             volume_element = self.construct_volume_element(
                              which_dist,
                              collapse_cmps=False)
-            P_lw /= volume_element
-        return P_lw
+            log_P_lw -= np.log(volume_element)
+        return log_P_lw
 
-    def get_conditional_distribution(self,
-                                     which_dist,
-                                     light_weighted=False,
-                                     density=True):
+    def get_log_conditional_distribution(self,
+                                         which_dist,
+                                         light_weighted=False,
+                                         density=True):
         """Get conditional distributions
 
         This is intended to be called only by the `get_p` wrapper method - see
@@ -287,8 +333,8 @@ class IFUCube(object):
          # get an alphabetically ordered string for the joint distribution
         joint = ''.join(sorted(dist+marginal))
         kwargs = {'density':False, 'light_weighted':light_weighted}
-        p_joint = self.get_p(joint, collapse_cmps=False, **kwargs)
-        p_marginal = self.get_p(marginal, collapse_cmps=True, **kwargs)
+        log_p_joint = self.get_log_p(joint, collapse_cmps=False, **kwargs)
+        log_p_marginal = self.get_log_p(marginal, collapse_cmps=True, **kwargs)
         # if x is in joint/marginalal, repalace it with xy to account for the
         # fact that x stands for 2D positon (x,y)
         joint = joint.replace('x', 'xy')
@@ -296,17 +342,17 @@ class IFUCube(object):
         # first dimension in the joint corresponts to component index:
         joint = 'i' + joint
         # for each entry in the marginal, find its position in the joint
-        old_pos_in_joint = [joint.find(m0) for m0 in marginal]
+        old_pos = [joint.find(m0) for m0 in marginal]
         # move the marginal variables to the far right of the joint
         n_marginal = len(marginal)
-        new_pos_in_joint = [-(i+1) for i in range(n_marginal)][::-1]
-        p_joint = np.moveaxis(p_joint, old_pos_in_joint, new_pos_in_joint)
+        new_pos = [-(i+1) for i in range(n_marginal)][::-1]
+        log_p_joint = np.moveaxis(log_p_joint, old_pos, new_pos)
         # get the conditional probability
-        p_conditional = p_joint/p_marginal
+        log_p_conditional = log_p_joint - log_p_marginal
         if density:
-            dvol = self.construct_volume_element(which_dist)
-            p_conditional = p_conditional/dvol
-        return p_conditional
+            log_dvol = np.log(self.construct_volume_element(which_dist))
+            log_p_conditional = log_p_conditional - log_dvol
+        return log_p_conditional
 
     def construct_volume_element(self,
                                  which_dist,
@@ -415,8 +461,13 @@ class IFUCube(object):
         """
         mu_i = np.array([
             cmp.get_mean(which_dist, light_weighted=light_weighted)
-            for cmp in self.component_list])
-        mean = np.sum(self.weights * mu_i.T, -1).T
+            for cmp in self.component_list
+            ])
+        is_conditional = '_' in which_dist
+        if is_conditional is False:
+            mean = np.sum(self.weights * mu_i.T, -1).T
+        else:
+            conditioners = which_dist.split('/')[1]
         return mean
 
     def get_central_moment(self, which_dist, j, light_weighted=False):

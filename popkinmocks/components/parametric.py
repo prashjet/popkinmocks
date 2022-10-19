@@ -113,10 +113,6 @@ class ParametricComponent(base.Component):
         beta = stats.beta(a, b,
                           loc=age_loc,
                           scale=age_scale)
-        beta_cdf = beta.cdf(age_bin_edges)
-        t_weights = beta_cdf[1:] - beta_cdf[:-1]
-        dt = age_bin_edges[1:] - age_bin_edges[:-1]
-        p_t = t_weights/dt
         t_start_end = beta.ppf(cdf_start_end)
         t_start, t_end = t_start_end
         idx_start_end = np.digitize(t_start_end, age_bin_edges)
@@ -126,9 +122,14 @@ class ParametricComponent(base.Component):
                            t_start=t_start,
                            t_end=t_end,
                            delta_t=delta_t,
-                           idx_start_end=idx_start_end,
-                           dt=dt)
-        self.p_t = p_t
+                           idx_start_end=idx_start_end)
+        t_edges = self.cube.ssps.par_edges[1]
+        log_cdf_t = beta.logcdf(t_edges)
+        tmp = np.array([log_cdf_t[1:], log_cdf_t[:-1]])
+        tmp = special.logsumexp(tmp.T, -1, [1,-1]).T
+        log_dt = np.log(self.construct_volume_element('t'))
+        self.log_p_t = tmp - log_dt
+        self.p_t = np.exp(self.log_p_t)
 
     @abstractmethod
     def set_p_x_t(self):
@@ -151,20 +152,48 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_x_t = self.p_x_t.copy()
+        #     if density is False:
+        #         p_x_t *= (self.cube.dx * self.cube.dy)
+        # else:
+        #     p_txz = self.get_p_txz(density=density, light_weighted=True)
+        #     if density is True:
+        #         ssps = self.cube.ssps
+        #         p_txz = p_txz * ssps.delta_z
+        #     p_tx = np.sum(p_txz, -1)
+        #     p_t = self.get_p_t(density=density, light_weighted=True)
+        #     p_x_t = (p_tx.T/p_t).T
+        #     p_x_t = np.einsum('txy->xyt', p_x_t)
+        # return p_x_t
+        return np.exp(self.get_log_p_x_t(density=density, light_weighted=light_weighted))
+
+
+    def get_log_p_x_t(self, density=True, light_weighted=False):
+        """Get log p(x|t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         if light_weighted is False:
-            p_x_t = self.p_x_t.copy()
-            if density is False:
-                p_x_t *= (self.cube.dx * self.cube.dy)
+            log_p_x_t = self.log_p_x_t.copy()
         else:
-            p_txz = self.get_p_txz(density=density, light_weighted=True)
-            if density is True:
-                ssps = self.cube.ssps
-                p_txz = p_txz * ssps.delta_z
-            p_tx = np.sum(p_txz, -1)
-            p_t = self.get_p_t(density=density, light_weighted=True)
-            p_x_t = (p_tx.T/p_t).T
-            p_x_t = np.einsum('txy->xyt', p_x_t)
-        return p_x_t
+            log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
+            log_dz = np.log(self.construct_volume_element('z'))
+            log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
+            log_p_t = self.get_log_p_t(density=True, light_weighted=True)
+            log_p_x_t = (log_p_tx.T - log_p_t).T
+            log_p_x_t = np.moveaxis(log_p_x_t, 0, -1)
+        if density is False:
+            log_p_x_t += np.log(self.cube.dx) + np.log(self.cube.dy)
+        return log_p_x_t
 
     @abstractmethod
     def set_mu_v(self):
@@ -195,30 +224,43 @@ class ParametricComponent(base.Component):
             array
 
         """
+        log_p_v_tx = self.get_log_p_v_tx(
+            density=density,
+            light_weighted=light_weighted)
+        return np.exp(log_p_v_tx)
+
+    def get_log_p_v_tx(self, density=True, light_weighted=False):
+        """Get log p(v|t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         na = np.newaxis
         if light_weighted is False:
             v_edg = self.cube.v_edg[:, na, na, na]
             norm = stats.norm(loc=self.mu_v, scale=self.sig_v)
-            p_v_tx = norm.cdf(v_edg[1:]) - norm.cdf(v_edg[:-1])
-            if density is True:
-                dv = v_edg[1:] - v_edg[:-1]
-                p_v_tx /= dv
+            log_cdf_0 = norm.logcdf(v_edg[:-1])
+            log_cdf_1 = norm.logcdf(v_edg[1:])
+            log_cdf = np.array([log_cdf_1, log_cdf_0]).T
+            log_p_v_tx = special.logsumexp(log_cdf, -1, b=[1,-1]).T
         else:
-            p_tvxz = self.get_p_tvxz(density=True, light_weighted=True)
-            if density is False:
-                dv = self.cube.v_edg[1:] - self.cube.v_edg[:-1]
-                dv = dv[na, :, na, na, na]
-                p_tvxz = p_tvxz*dv
-            ssps = self.cube.ssps
-            p_tvx = np.sum(p_tvxz*ssps.delta_z, -1)
-            p_x_t = self.get_p_x_t(density=True, light_weighted=True)
-            p_t = self.get_p_t(density=True, light_weighted=True)
-            p_xt = p_x_t * p_t
-            p_tx = np.einsum('xyt->txy', p_xt)
-            p_tx = p_tx[:, na, :, :]
-            p_v_tx = p_tvx/p_tx
-            p_v_tx = np.einsum('tvxy->vtxy', p_v_tx)
-        return p_v_tx
+            log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=True)
+            log_p_tvx = special.logsumexp(log_p_tvxz, -1)
+            log_p_tx = special.logsumexp(log_p_tvx, 1)
+            na = np.newaxis
+            log_p_v_tx = log_p_tvx - log_p_tx[:,na,:,:]
+            log_p_v_tx = np.moveaxis(log_p_v_tx, 0, 1)
+        if density is True:
+            dv = self.construct_volume_element('v')
+            log_p_v_tx = (log_p_v_tx.T - np.log(dv)).T
+        return log_p_v_tx
 
     def get_z_interpolation_grid(self,
                                  t_dep_lim=(0.1, 10.),
@@ -284,16 +326,18 @@ class ParametricComponent(base.Component):
         z_mu = np.moveaxis(z_mu, -1, 0)
         z_sig2 = self.ahat * z_mu**self.bhat
         log_z_edg = self.cube.ssps.par_edges[0]
-        del_log_z = log_z_edg[1:] - log_z_edg[:-1]
         x_xsun = 1. # i.e. assuming galaxy has hydrogen mass fraction = solar
         lin_z_edg = 10.**log_z_edg * x_xsun
         nrm = stats.norm(loc=z_mu, scale=z_sig2**0.5)
         lin_z_edg = lin_z_edg[:, np.newaxis, np.newaxis, np.newaxis]
-        cdf_z_tx = nrm.cdf(lin_z_edg)
-        p_z_tx = cdf_z_tx[1:] - cdf_z_tx[:-1]
-        nrm = np.sum(p_z_tx.T * del_log_z, -1).T
-        p_z_tx /= nrm
-        self.p_z_tx = p_z_tx
+        # add the log quantity
+        log_cdf_z_tx = nrm.logcdf(lin_z_edg)
+        tmp = np.array([log_cdf_z_tx[1:], log_cdf_z_tx[:-1]])
+        tmp = special.logsumexp(tmp.T, -1, b=[1,-1]).T
+        log_dz = np.log(self.construct_volume_element('z'))
+        log_norm = special.logsumexp(tmp.T + log_dz, -1).T
+        self.log_p_z_tx = tmp - log_norm
+        self.p_z_tx = np.exp(self.log_p_z_tx)
 
     def get_p_z_tx(self, density=True, light_weighted=False):
         """Get p(z|t,x)
@@ -308,19 +352,47 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_z_tx = self.p_z_tx.copy()
+        # else:
+        #     p_txz = self.get_p_txz(density=True, light_weighted=True)
+        #     p_tx = self.get_p_tx(density=True, light_weighted=True)
+        #     p_z_tx = (p_txz.T/p_tx.T).T
+        #     p_z_tx = np.einsum('txyz->ztxy', p_z_tx)
+        # if density is False:
+        #     dz = self.cube.ssps.delta_z
+        #     na = np.newaxis
+        #     dz = dz[:, na, na, na]
+        #     p_z_tx *= dz
+        # return p_z_tx
+        return np.exp(self.get_log_p_z_tx(density=density, light_weighted=light_weighted))
+
+    def get_log_p_z_tx(self, density=True, light_weighted=False):
+        """Get log p(z|t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        # TODO: COMPLETE THIS!!!
         if light_weighted is False:
-            p_z_tx = self.p_z_tx.copy()
+            log_p_z_tx = self.log_p_z_tx.copy() # = density
         else:
-            p_txz = self.get_p_txz(density=True, light_weighted=True)
-            p_tx = self.get_p_tx(density=True, light_weighted=True)
-            p_z_tx = (p_txz.T/p_tx.T).T
-            p_z_tx = np.einsum('txyz->ztxy', p_z_tx)
+            log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
+            log_dz = np.log(self.construct_volume_element('z'))
+            log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
+            log_p_z_tx = (log_p_txz.T - log_p_tx.T).T
+            log_p_z_tx = np.moveaxis(log_p_z_tx, -1, 0)
         if density is False:
-            dz = self.cube.ssps.delta_z
-            na = np.newaxis
-            dz = dz[:, na, na, na]
-            p_z_tx *= dz
-        return p_z_tx
+            log_dz = np.log(self.construct_volume_element('z'))
+            log_p_z_tx = (log_p_z_tx.T + log_dz).T
+        return log_p_z_tx
 
     def evaluate_ybar(self):
         """Evaluate the datacube for this component
@@ -370,17 +442,41 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_t = self.p_t.copy()
+        #     if density is False:
+        #         p_t *= self.cube.ssps.delta_t
+        # else:
+        #     p_tz = self.get_p_tz(density=False, light_weighted=True)
+        #     p_t = np.sum(p_tz, 1)
+        #     if density is True:
+        #         ssps = self.cube.ssps
+        #         p_t = p_t/ssps.delta_t
+        # return p_t
+        return np.exp(self.get_log_p_t(density=density, light_weighted=light_weighted))
+
+    def get_log_p_t(self, density=True, light_weighted=False):
+        """Get log p(t)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         if light_weighted is False:
-            p_t = self.p_t.copy()
-            if density is False:
-                p_t *= self.cube.ssps.delta_t
+            log_p_t = self.log_p_t.copy()
         else:
-            p_tz = self.get_p_tz(density=False, light_weighted=True)
-            p_t = np.sum(p_tz, 1)
-            if density is True:
-                ssps = self.cube.ssps
-                p_t = p_t/ssps.delta_t
-        return p_t
+            log_p_tz = self.get_log_p_tz(density=True, light_weighted=True)
+            log_dz = np.log(self.construct_volume_element('z'))
+            log_p_t = special.logsumexp(log_p_tz + log_dz, 1)
+        if density is False:
+            log_p_t += np.log(self.construct_volume_element('t'))
+        return log_p_t
 
     def get_p_tv(self, density=True, light_weighted=False):
         """Get p(t,v)
@@ -395,11 +491,33 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # if density is True:
+        #     p_tvx *= self.cube.dx*self.cube.dy
+        # p_tv = np.sum(p_tvx, (-1,-2))
+        # return p_tv
+        return np.exp(self.get_log_p_tv(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tv(self, density=True, light_weighted=False):
+        """Get log p(t,v)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_tvx = self.get_log_p_tvx(
+            density=density,
+            light_weighted=light_weighted)
         if density is True:
-            p_tvx *= self.cube.dx*self.cube.dy
-        p_tv = np.sum(p_tvx, (-1,-2))
-        return p_tv
+            log_p_tvx += np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_tv = special.logsumexp(log_p_tvx, (-1,-2))
+        return log_p_tv
 
     def get_p_tx(self, density=True, light_weighted=False):
         """Get p(t,x)
@@ -414,17 +532,43 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_x_t = self.get_p_x_t(density=density, light_weighted=False)
+        #     p_t = self.get_p_t(density=density, light_weighted=False)
+        #     p_xt = p_x_t*p_t
+        #     p_tx = np.einsum('xyt->txy', p_xt)
+        # else:
+        #     p_txz = self.get_p_txz(density=density, light_weighted=True)
+        #     if density is True:
+        #         p_txz *= self.cube.ssps.delta_z
+        #     p_tx = np.sum(p_txz, -1)
+        # return p_tx
+        return np.exp(self.get_log_p_tx(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tx(self, density=True, light_weighted=False):
+        """Get log p(t,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         if light_weighted is False:
-            p_x_t = self.get_p_x_t(density=density, light_weighted=False)
-            p_t = self.get_p_t(density=density, light_weighted=False)
-            p_xt = p_x_t*p_t
-            p_tx = np.einsum('xyt->txy', p_xt)
+            log_p_x_t = self.get_log_p_x_t(density=density, light_weighted=False)
+            log_p_t = self.get_log_p_t(density=density, light_weighted=False)
+            log_p_tx = log_p_x_t + log_p_t
+            log_p_tx = np.moveaxis(log_p_tx, -1, 0)
         else:
-            p_txz = self.get_p_txz(density=density, light_weighted=True)
+            log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
             if density is True:
-                p_txz *= self.cube.ssps.delta_z
-            p_tx = np.sum(p_txz, -1)
-        return p_tx
+                log_p_txz += np.log(self.construct_volume_element('z'))
+            log_p_tx = special.logsumexp(log_p_txz, -1)
+        return log_p_tx
 
     def get_p_tz(self, density=True, light_weighted=False):
         """Get p(t,z)
@@ -439,11 +583,32 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
+        # p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
+        # if density is True:
+        #     p_txz *= self.cube.dx*self.cube.dy
+        # p_tz = np.sum(p_txz, (1,2))
+        # return p_tz
+        return np.exp(self.get_log_p_tz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tz(self, density=True, light_weighted=False):
+        """Get log p(t,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_txz = self.get_log_p_txz(density=density,
+                                       light_weighted=light_weighted)
         if density is True:
-            p_txz *= self.cube.dx*self.cube.dy
-        p_tz = np.sum(p_txz, (1,2))
-        return p_tz
+            log_p_txz += np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_tz = special.logsumexp(log_p_txz, (1,2))
+        return log_p_tz
 
     def get_p_tvx(self, density=True, light_weighted=False):
         """Get p(t,v,x)
@@ -458,17 +623,46 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_tx = self.get_p_tx(density=density, light_weighted=False)
+        #     p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+        #     na = np.newaxis
+        #     p_tvx = p_tx[:,na,:,:] * np.moveaxis(p_v_tx, 0, 1)
+        # else:
+        #     p_tvxz = self.get_p_tvxz(density=density, light_weighted=True)
+        #     if density is True:
+        #         p_tvxz *= self.cube.ssps.delta_z
+        #     p_tvx = np.sum(p_tvxz, -1)
+        # return p_tvx
+        return np.exp(self.get_log_p_tvx(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tvx(self, density=True, light_weighted=False):
+        """Get log p(t,v,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         if light_weighted is False:
-            p_tx = self.get_p_tx(density=density, light_weighted=False)
-            p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+            log_p_tx = self.get_log_p_tx(density=density,
+                                         light_weighted=False)
+            log_p_v_tx = self.get_log_p_v_tx(density=density,
+                                             light_weighted=False)
             na = np.newaxis
-            p_tvx = p_tx[:,na,:,:] * np.moveaxis(p_v_tx, 0, 1)
+            log_p_tvx = log_p_tx[:,na,:,:] + np.moveaxis(log_p_v_tx, 0, 1)
         else:
-            p_tvxz = self.get_p_tvxz(density=density, light_weighted=True)
+            log_p_tvxz = self.get_log_p_tvxz(density=density,
+                                             light_weighted=True)
             if density is True:
-                p_tvxz *= self.cube.ssps.delta_z
-            p_tvx = np.sum(p_tvxz, -1)
-        return p_tvx
+                log_p_tvxz += np.log(self.construct_volume_element('z'))
+            log_p_tvx = special.logsumexp(log_p_tvxz, -1)
+        return log_p_tvx
 
     def get_p_tvz(self, density=True, light_weighted=False):
         """Get p(t,v,z)
@@ -483,11 +677,32 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
+        # p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
+        # if density is True:
+        #     p_tvxz *= self.cube.dx*self.cube.dy
+        # p_tvz = np.sum(p_tvxz, (2,3))
+        # return p_tvz
+        return np.exp(self.get_log_p_tvz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tvz(self, density=True, light_weighted=False):
+        """Get log p(t,v,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_tvxz = self.get_log_p_tvxz(density=density,
+                                         light_weighted=light_weighted)
         if density is True:
-            p_tvxz *= self.cube.dx*self.cube.dy
-        p_tvz = np.sum(p_tvxz, (2,3))
-        return p_tvz
+            log_p_tvxz += np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_tvz = special.logsumexp(log_p_tvxz, (2,3))
+        return log_p_tvz
 
     def get_p_txz(self, density=True, light_weighted=False):
         """Get p(t,x,z)
@@ -502,17 +717,46 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # na = np.newaxis
+        # p_tx = self.get_p_tx(density=density, light_weighted=False)
+        # p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
+        # p_txz = p_tx[:,:,:,na] * np.moveaxis(p_z_tx, 0, -1)
+        # if light_weighted:
+        #     P_txz_mass_wtd = self.get_p_txz(density=False, light_weighted=False)
+        #     light_weights = self.cube.ssps.light_weights[:,na,na,:]
+        #     P_txz_light_wtd = P_txz_mass_wtd * light_weights
+        #     normalisation = np.sum(P_txz_light_wtd)
+        #     p_txz = p_txz * light_weights / normalisation
+        # return p_txz
+        return np.exp(self.get_log_p_txz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_txz(self, density=True, light_weighted=False):
+        """Get log p(t,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         na = np.newaxis
-        p_tx = self.get_p_tx(density=density, light_weighted=False)
-        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-        p_txz = p_tx[:,:,:,na] * np.moveaxis(p_z_tx, 0, -1)
+        log_p_tx = self.get_log_p_tx(density=density, light_weighted=False)
+        log_p_z_tx = self.get_log_p_z_tx(density=density, light_weighted=False)
+        log_p_txz = log_p_tx[:,:,:,na] + np.moveaxis(log_p_z_tx, 0, -1)
         if light_weighted:
-            P_txz_mass_wtd = self.get_p_txz(density=False, light_weighted=False)
+            log_P_txz_mass_wtd = self.get_log_p_txz(
+                density=False,
+                light_weighted=False)
             light_weights = self.cube.ssps.light_weights[:,na,na,:]
-            P_txz_light_wtd = P_txz_mass_wtd * light_weights
-            normalisation = np.sum(P_txz_light_wtd)
-            p_txz = p_txz * light_weights / normalisation
-        return p_txz
+            log_lw = np.log(light_weights)
+            log_P_txz_light_wtd = log_P_txz_mass_wtd + log_lw
+            log_normalisation = special.logsumexp(log_P_txz_light_wtd)
+            log_p_txz = log_p_txz + log_lw - log_normalisation
+        return log_p_txz
 
     def get_p_tvxz(self, density=True, light_weighted=False):
         """Get p(t,v,x,z)
@@ -527,19 +771,49 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # na = np.newaxis
+        # p_txz = self.get_p_txz(density=density, light_weighted=False)
+        # p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+        # p_v_txz = p_v_tx[:,:,:,:,na]
+        # p_tvxz = np.moveaxis(p_v_txz, 0, 1) * p_txz[:,na,:,:,:]
+        # if light_weighted:
+        #     P_tvxz_mass_wtd = self.get_p_tvxz(density=False,
+        #                                       light_weighted=False)
+        #     light_weights = self.cube.ssps.light_weights[:,na,na,na,:]
+        #     P_tvxz_light_wtd = P_tvxz_mass_wtd * light_weights
+        #     normalisation = np.sum(P_tvxz_light_wtd)
+        #     p_tvxz = p_tvxz * light_weights / normalisation
+        # return p_tvxz
+        return np.exp(self.get_log_p_tvxz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_tvxz(self, density=True, light_weighted=False):
+        """Get log p(t,v,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         na = np.newaxis
-        p_txz = self.get_p_txz(density=density, light_weighted=False)
-        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
-        p_v_txz = p_v_tx[:,:,:,:,na]
-        p_tvxz = np.moveaxis(p_v_txz, 0, 1) * p_txz[:,na,:,:,:]
+        log_p_txz = self.get_log_p_txz(density=density, light_weighted=False)
+        log_p_v_tx = self.get_log_p_v_tx(density=density, light_weighted=False)
+        log_p_v_txz = log_p_v_tx[:,:,:,:,na]
+        log_p_tvxz = np.moveaxis(log_p_v_txz, 0, 1) + log_p_txz[:,na,:,:,:]
         if light_weighted:
-            P_tvxz_mass_wtd = self.get_p_tvxz(density=False,
-                                              light_weighted=False)
+            log_P_tvxz_mass_wtd = self.get_log_p_tvxz(
+                density=False,
+                light_weighted=False)
             light_weights = self.cube.ssps.light_weights[:,na,na,na,:]
-            P_tvxz_light_wtd = P_tvxz_mass_wtd * light_weights
-            normalisation = np.sum(P_tvxz_light_wtd)
-            p_tvxz = p_tvxz * light_weights / normalisation
-        return p_tvxz
+            log_lw = np.log(light_weights)
+            log_P_tvxz_light_wtd = log_P_tvxz_mass_wtd + log_lw
+            log_normalisation = special.logsumexp(log_P_tvxz_light_wtd)
+            log_p_tvxz = log_p_tvxz + log_lw - log_normalisation
+        return log_p_tvxz
 
     def get_p_v(self, density=True, light_weighted=False):
         """Get p(v)
@@ -554,12 +828,35 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # if density is True:
+        #     p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
+        #     p_tvx *= self.cube.dx*self.cube.dy
+        # p_v = np.sum(p_tvx, (0,2,3))
+        # return p_v
+        return np.exp(self.get_log_p_v(density=density, light_weighted=light_weighted))
+
+    def get_log_p_v(self, density=True, light_weighted=False):
+        """Get log p(v)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_tvx = self.get_log_p_tvx(density=density,
+                                       light_weighted=light_weighted)
         if density is True:
-            p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
-            p_tvx *= self.cube.dx*self.cube.dy
-        p_v = np.sum(p_tvx, (0,2,3))
-        return p_v
+            log_dt = np.log(self.construct_volume_element('t'))
+            log_p_tvx = (log_p_tvx.T + log_dt).T
+            log_p_tvx += np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_tvx = special.logsumexp(log_p_tvx, (0,2,3))
+        return log_p_tvx
 
     def get_p_vx(self, density=True, light_weighted=False):
         """Get p(v,x)
@@ -574,11 +871,34 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
+        # if density is True:
+        #     p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
+        # p_vx = np.sum(p_tvx, 0)
+        # return p_vx
+        return np.exp(self.get_log_p_vx(density=density, light_weighted=light_weighted))
+
+    def get_log_p_vx(self, density=True, light_weighted=False):
+        """Get log p(v,x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_tvx = self.get_log_p_tvx(
+            density=density,
+            light_weighted=light_weighted)
         if density is True:
-            p_tvx = (p_tvx.T * self.cube.ssps.delta_t).T
-        p_vx = np.sum(p_tvx, 0)
-        return p_vx
+            log_dt = np.log(self.construct_volume_element('t'))
+            log_p_tvx = (log_p_tvx.T + log_dt).T
+        log_p_tvx = special.logsumexp(log_p_tvx, 0)
+        return log_p_tvx
 
     def get_p_vz(self, density=True, light_weighted=False):
         """Get p(v,z)
@@ -593,11 +913,32 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_vxz = self.get_p_vxz(density=density, light_weighted=light_weighted)
+        # p_vxz = self.get_p_vxz(density=density, light_weighted=light_weighted)
+        # if density:
+        #     p_vxz *= self.cube.dx*self.cube.dy
+        # p_vz = np.sum(p_vxz, (1,2))
+        # return p_vz
+        return np.exp(self.get_log_p_vz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_vz(self, density=True, light_weighted=False):
+        """Get log p(v,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_vxz = self.get_log_p_vxz(density=density,
+                                       light_weighted=light_weighted)
         if density:
-            p_vxz *= self.cube.dx*self.cube.dy
-        p_vz = np.sum(p_vxz, (1,2))
-        return p_vz
+            log_p_vxz += np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_vz = special.logsumexp(log_p_vxz, (1,2))
+        return log_p_vz
 
     def get_p_vxz(self, density=True, light_weighted=False):
         """Get p(v,x,z)
@@ -612,11 +953,32 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
+        # p_tvxz = self.get_p_tvxz(density=density, light_weighted=light_weighted)
+        # if density:
+        #     p_tvxz = (p_tvxz.T * self.cube.ssps.delta_t).T
+        # p_vxz = np.sum(p_tvxz, 0)
+        # return p_vxz
+        return np.exp(self.get_log_p_vxz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_vxz(self, density=True, light_weighted=False):
+        """Get log p(v,x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_tvxz = self.get_log_p_tvxz(density=density, light_weighted=light_weighted)
         if density:
-            p_tvxz = (p_tvxz.T * self.cube.ssps.delta_t).T
-        p_vxz = np.sum(p_tvxz, 0)
-        return p_vxz
+            log_dt = np.log(self.construct_volume_element('t'))
+            log_p_tvxz = (log_p_tvxz.T + log_dt).T
+        log_p_vxz = special.logsumexp(log_p_tvxz, 0)
+        return log_p_vxz
 
     def get_p_x(self, density=True, light_weighted=False):
         """Get p(x)
@@ -631,20 +993,47 @@ class ParametricComponent(base.Component):
             array
 
         """
+        # if light_weighted is False:
+        #     p_x_t = self.get_p_x_t(density=density)
+        #     P_t = self.get_p_t(density=False)
+        #     p_x = np.sum(p_x_t * P_t, -1)
+        # else:
+        #     na = np.newaxis
+        #     ssps = self.cube.ssps
+        #     p_txz = self.get_p_txz(density=density, light_weighted=True)
+        #     if density is False:
+        #         p_x = np.sum(p_txz, (0,3))
+        #     else:
+        #         delta_tz = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,na,na,:]
+        #         p_x = np.sum(p_txz*delta_tz, (0,3))
+        # return p_x
+        return np.exp(self.get_log_p_x(density=density, light_weighted=light_weighted))
+
+    def get_log_p_x(self, density=True, light_weighted=False):
+        """Get log p(x)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
         if light_weighted is False:
-            p_x_t = self.get_p_x_t(density=density)
-            P_t = self.get_p_t(density=False)
-            p_x = np.sum(p_x_t * P_t, -1)
+            log_p_x_t = self.get_log_p_x_t(density=density)
+            log_P_t = self.get_log_p_t(density=False)
+            log_p_x = special.logsumexp(log_p_x_t + log_P_t, -1)
         else:
-            na = np.newaxis
-            ssps = self.cube.ssps
-            p_txz = self.get_p_txz(density=density, light_weighted=True)
-            if density is False:
-                p_x = np.sum(p_txz, (0,3))
-            else:
-                delta_tz = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,na,na,:]
-                p_x = np.sum(p_txz*delta_tz, (0,3))
-        return p_x
+            log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
+            if density is True:
+                log_dtdz = np.log(self.construct_volume_element('tz'))
+                na = np.newaxis
+                log_p_txz += log_dtdz[:,na,na,:]
+            log_p_x = special.logsumexp(log_p_txz, (0,3))
+        return log_p_x
 
     def get_p_xz(self, density=True, light_weighted=False):
         """Get p(x,z)
@@ -659,11 +1048,33 @@ class ParametricComponent(base.Component):
             array
 
         """
-        p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
+        # p_txz = self.get_p_txz(density=density, light_weighted=light_weighted)
+        # if density:
+        #     p_txz = (p_txz.T * self.cube.ssps.delta_t).T
+        # p_xz = np.sum(p_txz, 0)
+        # return p_xz
+        return np.exp(self.get_log_p_xz(density=density, light_weighted=light_weighted))
+
+    def get_log_p_xz(self, density=True, light_weighted=False):
+        """Get log p(x,z)
+
+        Args:
+            density (bool): whether to return probabilty density (True) or the
+            volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array
+
+        """
+        log_p_txz = self.get_log_p_txz(density=density,
+                                       light_weighted=light_weighted)
         if density:
-            p_txz = (p_txz.T * self.cube.ssps.delta_t).T
-        p_xz = np.sum(p_txz, 0)
-        return p_xz
+            log_dt = np.log(self.construct_volume_element('t'))
+            log_p_txz = (log_p_txz.T + log_dt).T
+        log_p_xz = special.logsumexp(log_p_txz, 0)
+        return log_p_xz
 
     def get_p_z(self, density=True, light_weighted=False):
         """Get p(z)
@@ -678,48 +1089,28 @@ class ParametricComponent(base.Component):
             array
 
         """
-        na = np.newaxis
-        if light_weighted is False:
-            p_z_tx = self.get_p_z_tx(density=density)
-            P_x_t = self.get_p_x_t(density=False) # to marginalise, must be a probabilty
-            P_x_t = np.einsum('xyt->txy', P_x_t)
-            P_x_t = P_x_t[na,:,:,:]
-            P_t = self.get_p_t(density=False) # to marginalise, must be a probabilty
-            P_t = P_t[na,:,na,na]
-            p_z = np.sum(p_z_tx * P_x_t * P_t, (1,2,3))
-        else:
-            p_tz = self.get_p_tz(density=density, light_weighted=True)
-            if density is False:
-                p_z = np.sum(p_tz, 0)
-            else:
-                ssps = self.cube.ssps
-                delta_t = ssps.delta_t[:,na]
-                p_z = np.sum(p_tz*delta_t, 0)
-        return p_z
+        # na = np.newaxis
+        # if light_weighted is False:
+        #     p_z_tx = self.get_p_z_tx(density=density)
+        #     P_x_t = self.get_p_x_t(density=False) # to marginalise, must be a probabilty
+        #     P_x_t = np.einsum('xyt->txy', P_x_t)
+        #     P_x_t = P_x_t[na,:,:,:]
+        #     P_t = self.get_p_t(density=False) # to marginalise, must be a probabilty
+        #     P_t = P_t[na,:,na,na]
+        #     p_z = np.sum(p_z_tx * P_x_t * P_t, (1,2,3))
+        # else:
+        #     p_tz = self.get_p_tz(density=density, light_weighted=True)
+        #     if density is False:
+        #         p_z = np.sum(p_tz, 0)
+        #     else:
+        #         ssps = self.cube.ssps
+        #         delta_t = ssps.delta_t[:,na]
+        #         p_z = np.sum(p_tz*delta_t, 0)
+        # return p_z
+        return np.exp(self.get_log_p_z(density=density, light_weighted=light_weighted))
 
-    def get_p_v_x(self, density=True, light_weighted=False):
-        """Get p(v|x)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted:
-            raise NotImplementedError
-        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
-        P_t = self.get_p_t(density=False, light_weighted=False)
-        na = np.newaxis
-        p_v_x = np.sum((p_v_tx.T * P_t[na].T).T, 1)
-        return p_v_x
-
-    def get_p_v_t(self, density=True, light_weighted=False):
-        """Get p(v|t)
+    def get_log_p_z(self, density=True, light_weighted=False):
+        """Get log p(z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -731,55 +1122,97 @@ class ParametricComponent(base.Component):
             array
 
         """
-        if light_weighted:
-            raise NotImplementedError
-        p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
-        P_x = self.get_p_x(density=False, light_weighted=False)
-        na = np.newaxis
-        p_v_t = np.sum((p_v_tx.T * P_x[na,na].T).T, (2,3))
-        return p_v_t
+        log_p_tz = self.get_log_p_tz(density=density,
+                                     light_weighted=light_weighted)
+        if density:
+            log_dt = np.log(self.construct_volume_element('t'))
+            log_p_tz = (log_p_tz.T + log_dt).T
+        log_p_z = special.logsumexp(log_p_tz, 0)
+        return log_p_z
 
-    def get_p_z_x(self, density=True, light_weighted=False):
-        """Get p(z|x)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted:
-            raise NotImplementedError
-        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-        P_t = self.get_p_t(density=False, light_weighted=False)
-        na = np.newaxis
-        p_z_x = np.sum((p_z_tx.T * P_t[na].T).T, 1)
-        return p_z_x
-
-    def get_p_z_t(self, density=True, light_weighted=False):
-        """Get p(z|t)
-
-        Args:
-            density (bool): whether to return probabilty density (True) or the
-            volume-element weighted probabilty (False)
-            light_weighted (bool): whether to return light-weighted (True) or
-            mass-weighted (False) quantity
-
-        Returns:
-            array
-
-        """
-        if light_weighted:
-            raise NotImplementedError
-        p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-        P_x = self.get_p_x(density=False, light_weighted=False)
-        na = np.newaxis
-        p_z_t = np.sum((p_z_tx.T * P_x[na,na].T).T, (2,3))
-        return p_z_t
+    # def get_p_v_x(self, density=True, light_weighted=False):
+    #     """Get p(v|x)
+    #
+    #     Args:
+    #         density (bool): whether to return probabilty density (True) or the
+    #         volume-element weighted probabilty (False)
+    #         light_weighted (bool): whether to return light-weighted (True) or
+    #         mass-weighted (False) quantity
+    #
+    #     Returns:
+    #         array
+    #
+    #     """
+    #     if light_weighted:
+    #         raise NotImplementedError
+    #     p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+    #     P_t = self.get_p_t(density=False, light_weighted=False)
+    #     na = np.newaxis
+    #     p_v_x = np.sum((p_v_tx.T * P_t[na].T).T, 1)
+    #     return p_v_x
+    #
+    # def get_p_v_t(self, density=True, light_weighted=False):
+    #     """Get p(v|t)
+    #
+    #     Args:
+    #         density (bool): whether to return probabilty density (True) or the
+    #         volume-element weighted probabilty (False)
+    #         light_weighted (bool): whether to return light-weighted (True) or
+    #         mass-weighted (False) quantity
+    #
+    #     Returns:
+    #         array
+    #
+    #     """
+    #     if light_weighted:
+    #         raise NotImplementedError
+    #     p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
+    #     P_x = self.get_p_x(density=False, light_weighted=False)
+    #     na = np.newaxis
+    #     p_v_t = np.sum((p_v_tx.T * P_x[na,na].T).T, (2,3))
+    #     return p_v_t
+    #
+    # def get_p_z_x(self, density=True, light_weighted=False):
+    #     """Get p(z|x)
+    #
+    #     Args:
+    #         density (bool): whether to return probabilty density (True) or the
+    #         volume-element weighted probabilty (False)
+    #         light_weighted (bool): whether to return light-weighted (True) or
+    #         mass-weighted (False) quantity
+    #
+    #     Returns:
+    #         array
+    #
+    #     """
+    #     if light_weighted:
+    #         raise NotImplementedError
+    #     p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
+    #     P_t = self.get_p_t(density=False, light_weighted=False)
+    #     na = np.newaxis
+    #     p_z_x = np.sum((p_z_tx.T * P_t[na].T).T, 1)
+    #     return p_z_x
+    #
+    # def get_p_z_t(self, density=True, light_weighted=False):
+    #     """Get p(z|t)
+    #
+    #     Args:
+    #         density (bool): whether to return probabilty density (True) or the
+    #         volume-element weighted probabilty (False)
+    #         light_weighted (bool): whether to return light-weighted (True) or
+    #         mass-weighted (False) quantity
+    #
+    #     Returns:
+    #         array
+    #
+    #     """
+    #     if light_weighted:
+    #         raise NotImplementedError
+    #     p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
+    #     P_x = self.get_p_x(density=False, light_weighted=False)
+    #     na = np.newaxis
+    #     p_z_t = np.sum((p_z_tx.T * P_x[na,na].T).T, (2,3))
+    #     return p_z_t
 
     def get_central_moment_v_tx(self, j, light_weighted=False):
         """Get j'th central moment of p(v|t,x)

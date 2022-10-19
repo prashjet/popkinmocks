@@ -1,28 +1,28 @@
 import numpy as np
-from scipy import interpolate
+from scipy import interpolate, special
 import copy
 from functools import partial
 
 class Component(object):
     """A galaxy component
 
-    A component is specified by it's joint density p(t,x,v,z) over stellar age
-    t, 2D position x, line-of-sight velocity v, and metallicity z. Sub-classes
-    of `Component` correspond to specific (i) factorisations of the joint
-    density and, (ii) implementations of the factors.
+    A component is specified by it's log joint density log p(t,x,v,z) over
+    stellar age t, 2D position x, line-of-sight velocity v, and metallicity z.
+    Sub-classes of `Component` correspond to specific (i) factorisations of the
+    joint density and, (ii) implementations of the factors.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
         p_txvz (array): the 5D mass-weighted probabilty density p(t,x1,x2,v,z)
 
     """
-    def __init__(self, cube=None, p_tvxz=None):
+    def __init__(self, cube=None, log_p_tvxz=None):
         self.cube = cube
         dtvxz = self.construct_volume_element('tvxz')
-        if p_tvxz.shape==dtvxz.shape:
-            self.p_tvxz = p_tvxz
+        if log_p_tvxz.shape==dtvxz.shape:
+            self.log_p_tvxz = log_p_tvxz
         else:
-            err = f'`p_tvxz` has shape {p_tvxz.shape} '
+            err = f'`log_p_tvxz` has shape {log_p_tvxz.shape} '
             err += f'but should have shape {dtvxz.shape}'
             raise ValueError(err)
 
@@ -55,28 +55,61 @@ class Component(object):
                 dimensions corresponding to [t,z,x1,x2].
 
         """
+        log_p = self.get_log_p(
+            which_dist,
+            density=density,
+            light_weighted=light_weighted)
+        p = np.exp(log_p)
+        return p
+
+    def get_log_p(self, which_dist, density=True, light_weighted=False):
+        """Evaluate log probability functions
+
+        Evaluate marginal or conditional distributions over stellar age t, 2D
+        position x, velocity v and metallicity z. The argument `which_dist`
+        specifies which distribution to evaluate, where an underscore (if
+        present) represents conditioning e.g.
+        - `which_dist = 'tv'` --> log p(t,v),
+        - `which_dist = 'tz_x'` --> log p(t,z|x) etc ...
+        Variables in `which_dist` must be provided in alphabetical order (on
+        either side of the underscore if present).
+
+        Args:
+            which_dist (string): which density to evaluate
+            density (bool): whether to return probabilty density (True) or the
+                volume-element weighted probabilty (False)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            array: the desired distribution. Array dimensions correspond to the
+                order of variables as provided in `which_dist` string e.g.
+                `which_dist = tz_x` returns p(t,z|x) as a 4D array with
+                dimensions corresponding to [t,z,x1,x2].
+
+        """
         # TODO: error catching if the order of variables is not alphabetical
         is_conditional = '_' in which_dist
         if is_conditional:
-            p = self.get_conditional_distribution(
+            log_p = self.get_log_conditional_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
         else:
-            p = self.get_marginal_distribution(
+            log_p = self.get_log_marginal_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
-        return p
+        return log_p
 
-    def get_marginal_distribution(self,
-                                  which_dist,
-                                  density=True,
-                                  light_weighted=False):
+    def get_log_marginal_distribution(self,
+                                      which_dist,
+                                      density=True,
+                                      light_weighted=False):
         """Evaluate marginal distributions for this component
 
-        This is intended to be called only by the `get_p` wrapper method - see
-        that docstring for more info.
+        This is intended to be called only by the `get_log_p` wrapper method -
+        see that docstring for more info.
 
         Args:
             which_dist (string): which density to evaluate.
@@ -90,19 +123,19 @@ class Component(object):
 
         """
         # TODO: check that `which_dist` has no underscore and is alphabetical
-        p_func = getattr(self, 'get_p_'+which_dist)
-        p = p_func(density=density, light_weighted=light_weighted)
-        return p
+        log_p_func = getattr(self, 'get_log_p_'+which_dist)
+        log_p = log_p_func(density=density, light_weighted=light_weighted)
+        return log_p
 
-    def get_conditional_distribution(self,
-                                     which_dist,
-                                     light_weighted=False,
-                                     density=True):
-        """Get conditional distributions for this component
+    def get_log_conditional_distribution(self,
+                                         which_dist,
+                                         light_weighted=False,
+                                         density=True):
+        """Get log conditional distributions for this component
 
-        This is intended to be called only by the `get_p` wrapper method - see
-        that docstring for more info. Evaluates conditionals as the quotient of
-        two marginal distributions.
+        This is intended to be called only by the `get_log_p` wrapper method -
+        see that docstring for more info. Evaluates log conditionals as the
+        difference of two log marginal distributions.
 
         Args:
             which_dist (string): which density to evaluate.
@@ -119,14 +152,15 @@ class Component(object):
         dist, marginal = which_dist.split('_')
         # if the conditional distribution is hard coded, then use that...
         try:
-            p_func = getattr(self, 'get_p_'+which_dist)
-            p_cond = p_func(density=density, light_weighted=light_weighted)
+            log_p_func = getattr(self, 'get_log_p_'+which_dist)
+            log_p_cond = log_p_func(density=density,
+                                    light_weighted=light_weighted)
         # ... otherwise compute conditional = joint/marginal
         except (AttributeError, NotImplementedError):
             joint = ''.join(sorted(dist+marginal))
             kwargs = {'density':False, 'light_weighted':light_weighted}
-            p_joint = self.get_p(joint, **kwargs)
-            p_marginal = self.get_p(marginal, **kwargs)
+            log_p_joint = self.get_log_p(joint, **kwargs)
+            log_p_marginal = self.get_log_p(marginal, **kwargs)
             # if x is in joint/marginalal, repalace it with xy to account for the
             # fact that x stands for 2D positon (x,y)
             joint = joint.replace('x', 'xy')
@@ -136,13 +170,15 @@ class Component(object):
             # move the marginal variables to the far right of the joint
             n_marginal = len(marginal)
             new_pos_in_joint = [-(i+1) for i in range(n_marginal)][::-1]
-            p_joint = np.moveaxis(p_joint, old_pos_in_joint, new_pos_in_joint)
-            # get the conditional probability
-            p_cond = p_joint/p_marginal
+            log_p_joint = np.moveaxis(log_p_joint,
+                                      old_pos_in_joint,
+                                      new_pos_in_joint)
+            # get the conditional probability (= nan if log_p_marginal = -inf)
+            log_p_cond = log_p_joint - log_p_marginal
             if density:
                 dvol = self.construct_volume_element(which_dist)
-                p_cond = p_cond/dvol
-        return p_cond
+                log_p_cond = log_p_cond - np.log(dvol)
+        return log_p_cond
 
     def construct_volume_element(self, which_dist):
         """Construct volume element for converting densities to probabilties
@@ -455,8 +491,8 @@ class Component(object):
         y = np.sum(y*dtz, (0,4)) * self.cube.dx * self.cube.dy
         self.ybar = y
 
-    def get_p_t(self, density=True, light_weighted=False):
-        """Get p(t)
+    def get_log_p_t(self, density=True, light_weighted=False):
+        """Get log p(t)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -468,14 +504,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_t = np.sum(p_tvxz, (1,2,3,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_t = special.logsumexp(log_p_tvxz, (1,2,3,4))
         if density:
-            p_t /= self.cube.ssps.delta_t
-        return p_t
+            log_p_t -= np.log(self.cube.ssps.delta_t)
+        return log_p_t
 
-    def get_p_tv(self, density=True, light_weighted=False):
-        """Get p(t,v)
+    def get_log_p_tv(self, density=True, light_weighted=False):
+        """Get log p(t,v)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -487,14 +524,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_tv = np.sum(p_tvxz, (2,3,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_tv = special.logsumexp(log_p_tvxz, (2,3,4))
         if density:
-            p_tv /= self.construct_volume_element('tv')
-        return p_tv
+            log_p_tv -= np.log(self.construct_volume_element('tv'))
+        return log_p_tv
 
-    def get_p_tx(self, density=True, light_weighted=False):
-        """Get p(t,x)
+    def get_log_p_tx(self, density=True, light_weighted=False):
+        """Get log p(t,x)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -506,14 +544,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_tx = np.sum(p_tvxz, (1,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_tx = special.logsumexp(log_p_tvxz, (1,4))
         if density:
-            p_tx /= self.construct_volume_element('tx')
+            log_p_tx -= np.log(self.construct_volume_element('tx'))
         return p_tx
 
-    def get_p_tz(self, density=True, light_weighted=False):
-        """Get p(t,z)
+    def get_log_p_tz(self, density=True, light_weighted=False):
+        """Get log p(t,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -525,14 +564,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_tz = np.sum(p_tvxz, (1,2,3))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_tz = special.logsumexp(log_p_tvxz, (1,2,3))
         if density:
-            p_tz /= self.construct_volume_element('tz')
+            log_p_tz -= np.log(self.construct_volume_element('tz'))
         return p_tz
 
-    def get_p_tvx(self, density=True, light_weighted=False):
-        """Get p(t,v,x)
+    def get_log_p_tvx(self, density=True, light_weighted=False):
+        """Get log p(t,v,x)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -544,14 +584,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_tvx = np.sum(p_tvxz, 4)
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_tvx = special.logsumexp(log_p_tvxz, 4)
         if density:
-            p_tvx /= self.construct_volume_element('tvx')
-        return p_tvx
+            log_p_tvx -= np.log(self.construct_volume_element('tvx'))
+        return log_p_tvx
 
-    def get_p_tvz(self, density=True, light_weighted=False):
-        """Get p(t,v,z)
+    def get_log_p_tvz(self, density=True, light_weighted=False):
+        """Get log p(t,v,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -563,14 +604,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_tvz = np.sum(p_tvxz, (2,3))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_tvz = special.logsumexp(log_p_tvxz, (2,3))
         if density:
-            p_tvz /= self.construct_volume_element('tvz')
-        return p_tvz
+            log_p_tvz -= np.log(self.construct_volume_element('tvz'))
+        return log_p_tvz
 
-    def get_p_txz(self, density=True, light_weighted=False):
-        """Get p(t,x,z)
+    def get_log_p_txz(self, density=True, light_weighted=False):
+        """Get log p(t,x,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -582,14 +624,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_txz = np.sum(p_tvxz, 1)
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_txz = special.logsumexp(log_p_tvxz, 1)
         if density:
-            p_txz /= self.construct_volume_element('txz')
+            log_p_txz -= np.log(self.construct_volume_element('txz'))
         return p_txz
 
-    def get_p_tvxz(self, density=True, light_weighted=False):
-        """Get p(t,v,x,z)
+    def get_log_p_tvxz(self, density=True, light_weighted=False):
+        """Get log p(t,v,x,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -601,13 +644,13 @@ class Component(object):
             array
 
         """
-        p_tvxz = copy.copy(self.p_tvxz)
+        log_p_tvxz = copy.copy(self.log_p_tvxz)
         if density is False:
-            p_tvxz *= self.construct_volume_element('tvxz')
-        return p_tvxz
+            log_p_tvxz += np.log(self.construct_volume_element('tvxz'))
+        return log_p_tvxz
 
-    def get_p_v(self, density=True, light_weighted=False):
-        """Get p(v)
+    def get_log_p_v(self, density=True, light_weighted=False):
+        """Get log p(v)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -619,14 +662,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_v = np.sum(p_tvxz, (0,2,3,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_v = special.logsumexp(p_tvxz, (0,2,3,4))
         if density:
-            p_v /= self.construct_volume_element('v')
-        return p_v
+            log_p_v -= np.log(self.construct_volume_element('v'))
+        return log_p_v
 
-    def get_p_vx(self, density=True, light_weighted=False):
-        """Get p(v,x)
+    def get_log_p_vx(self, density=True, light_weighted=False):
+        """Get log p(v,x)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -638,14 +682,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_vx = np.sum(p_tvxz, (0,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_vx = special.logsumexp(log_p_tvxz, (0,4))
         if density:
-            p_vx /= self.construct_volume_element('vx')
-        return p_vx
+            log_p_vx -= np.log(self.construct_volume_element('vx'))
+        return log_p_vx
 
-    def get_p_vz(self, density=True, light_weighted=False):
-        """Get p(v,z)
+    def get_log_p_vz(self, density=True, light_weighted=False):
+        """Get log p(v,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -657,14 +702,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_vz = np.sum(p_tvxz, (0,2,3))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_vz = special.logsumexp(log_p_tvxz, (0,2,3))
         if density:
-            p_vz /= self.construct_volume_element('vz')
-        return p_vz
+            log_p_vz -= np.log(self.construct_volume_element('vz'))
+        return log_p_vz
 
-    def get_p_vxz(self, density=True, light_weighted=False):
-        """Get p(v,x,z)
+    def get_log_p_vxz(self, density=True, light_weighted=False):
+        """Get log p(v,x,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -676,14 +722,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_vxz = np.sum(p_tvxz, 0)
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_vxz = special.logsumexp(log_p_tvxz, 0)
         if density:
-            p_vxz /= self.construct_volume_element('vxz')
-        return p_vxz
+            log_p_vxz -= np.log(self.construct_volume_element('vxz'))
+        return log_p_vxz
 
-    def get_p_x(self, density=True, light_weighted=False):
-        """Get p(x)
+    def get_log_p_x(self, density=True, light_weighted=False):
+        """Get log p(x)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -695,14 +742,14 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_x = np.sum(p_tvxz, (0,1,4))
+        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_x = special.logsumexp(log_p_tvxz, (0,1,4))
         if density:
-            p_x /= self.construct_volume_element('x')
-        return p_x
+            log_p_x -= np.log(self.construct_volume_element('x'))
+        return log_p_x
 
-    def get_p_xz(self, density=True, light_weighted=False):
-        """Get p(x,z)
+    def get_log_p_xz(self, density=True, light_weighted=False):
+        """Get log p(x,z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -714,14 +761,15 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_xz = np.sum(p_tvxz, (0,1))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_xz = special.logsumexp(log_p_tvxz, (0,1))
         if density:
-            p_xz /= self.construct_volume_element('xz')
-        return p_xz
+            log_p_xz -= np.log(self.construct_volume_element('xz'))
+        return log_p_xz
 
-    def get_p_z(self, density=True, light_weighted=False):
-        """Get p(z)
+    def get_log_p_z(self, density=True, light_weighted=False):
+        """Get log p(z)
 
         Args:
             density (bool): whether to return probabilty density (True) or the
@@ -733,8 +781,9 @@ class Component(object):
             array
 
         """
-        p_tvxz = self.get_p_tvxz(density=False, light_weighted=light_weighted)
-        p_z = np.sum(p_tvxz, (0,1,2,3))
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
+        log_p_z = special.logsumexp(log_p_tvxz, (0,1,2,3))
         if density:
-            p_z /= self.construct_volume_element('z')
-        return p_z
+            log_p_z -= np.log(self.construct_volume_element('z'))
+        return log_p_z

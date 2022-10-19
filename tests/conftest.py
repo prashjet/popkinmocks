@@ -2,18 +2,22 @@ import pytest
 import matplotlib.pyplot as plt
 import numpy as np
 import popkinmocks as pkm
+from itertools import chain, combinations
 
-def my_cube(nv=20):
-    vlim = 900
-    v_edg = np.linspace(-vlim, vlim, nv)
+N_VELOCITY_BINS = 20
+VELOCITY_LIMIT = 900
+NX, NY = 5,6
+
+def my_cube(nv=N_VELOCITY_BINS):
+    v_edg = np.linspace(-VELOCITY_LIMIT, VELOCITY_LIMIT, nv)
     ssps = pkm.model_grids.milesSSPs()
     ssps.logarithmically_resample(dv=v_edg[1]-v_edg[0])
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=9, ny=10, v_edg=v_edg)
+    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=NX, ny=NY, v_edg=v_edg)
     return cube
 
-def my_component(nv=20, eval_ybar=True):
+def my_component(nv=N_VELOCITY_BINS, eval_ybar=True):
     cube = my_cube(nv=nv)
     gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0,0))
     gc1.set_p_t(lmd=2., phi=0.8)
@@ -40,7 +44,7 @@ def my_component(nv=20, eval_ybar=True):
 def my_component_fixture():
     return my_component()
 
-def my_second_component(nv=20, eval_ybar=True):
+def my_second_component(nv=N_VELOCITY_BINS, eval_ybar=True):
     cube = my_cube(nv=nv)
     gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
@@ -69,7 +73,7 @@ def my_second_component(nv=20, eval_ybar=True):
 def my_second_component_fixture():
     return my_second_component()
 
-def my_stream_component(nv=20, eval_ybar=True):
+def my_stream_component(nv=N_VELOCITY_BINS, eval_ybar=True):
     cube = my_cube(nv=nv)
     stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
@@ -89,7 +93,7 @@ def my_stream_component(nv=20, eval_ybar=True):
 def my_stream_component_fixture():
     return my_stream_component()
 
-def my_three_component_cube(nv=20, eval_ybar=True):
+def my_three_component_cube(nv=N_VELOCITY_BINS, eval_ybar=True):
     cube, gc1 = my_component(nv=nv, eval_ybar=eval_ybar)
     gc2 = my_second_component(nv=nv, eval_ybar=eval_ybar)
     cube, stream = my_stream_component(nv=nv, eval_ybar=eval_ybar)
@@ -100,3 +104,39 @@ def my_three_component_cube(nv=20, eval_ybar=True):
 def my_three_component_cube_fixture():
     cube = my_three_component_cube()
     return cube
+
+def powerset(iterable):
+    "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    s = list(iterable)
+    poset = chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+    return list(poset)
+
+def distribution_list():
+    "get a list of all possible distributions involving the 4 pop-kin variables"
+    pkvars = ['t', 'v', 'x', 'z']
+    poset = powerset(pkvars)
+    subset_sizes = np.array([len(subset) for subset in poset])
+    # list possible combinations of numbers of independent/dependent variables
+    n_vars_in_dist = []
+    for n_depend in [1,2,3,4]:
+        for n_indep in np.arange(5-n_depend):
+            n_vars_in_dist += [(n_depend, n_indep)]
+    pk_distributions = []
+    for (nd, ni) in n_vars_in_dist:
+        idx_d = np.where(subset_sizes == nd)[0]
+        for idx_d0 in idx_d:
+            idx_i = np.where(subset_sizes == ni)[0]
+            for idx_i0 in idx_i:
+                # independent/dependent variables must be disjoint sets
+                if set(poset[idx_d0]).intersection(set(poset[idx_i0]))==set():
+                    str_d = ''.join(sorted(poset[idx_d0]))
+                    str_i = ''.join(sorted(poset[idx_i0]))
+                    if str_i=='':
+                        pk_distributions += [str_d]
+                    else:
+                        pk_distributions += [f'{str_d}_{str_i}']
+    return pk_distributions
+
+@pytest.fixture(scope="module", name='distribution_list')
+def distribution_list_fixture():
+    return distribution_list()

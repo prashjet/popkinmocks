@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import stats
+from scipy import stats, special
 from . import parametric
 
 class Stream(parametric.ParametricComponent):
@@ -63,23 +63,29 @@ class Stream(parametric.ParametricComponent):
         mu_r_smp =  mu_r0 + (mu_r1 - mu_r0) * tmp
         mu_x_smp = mu_r_smp * np.cos(theta_smp)
         nrm_x = stats.norm(mu_x_smp, sig)
-        pdf_x = nrm_x.cdf(self.xxp[:,:,np.newaxis] + cube.dx/2.)
-        pdf_x -= nrm_x.cdf(self.xxp[:,:,np.newaxis] - cube.dx/2.)
         mu_y_smp = mu_r_smp * np.sin(theta_smp)
         nrm_y = stats.norm(mu_y_smp, sig)
-        pdf_y = nrm_y.cdf(self.yyp[:,:,np.newaxis] + cube.dy/2.)
-        pdf_y -= nrm_y.cdf(self.yyp[:,:,np.newaxis] - cube.dy/2.)
-        pdf = pdf_x * pdf_y
-        pdf = np.sum(pdf, -1)
-        pdf /= np.sum(pdf*cube.dx*cube.dy)
         self.p_x_pars = dict(theta_lims=theta_lims,
                              mu_r_lims=mu_r_lims,
                              sig=sig,
                              nsmp=nsmp)
         nt = len(self.cube.get_variable_values('t'))
-        pdf = np.broadcast_to(pdf, (nt,)+pdf.shape)
-        pdf = np.moveaxis(pdf, 0, -1)
-        self.p_x_t = pdf
+        tmp = np.array([self.xxp[:,:,np.newaxis] + cube.dx/2.,
+                        self.xxp[:,:,np.newaxis] - cube.dx/2.])
+        tmp = nrm_x.logcdf(tmp)
+        log_p_x = special.logsumexp(tmp.T, -1, b=[1.,-1.]).T
+        tmp = np.array([self.yyp[:,:,np.newaxis] + cube.dy/2.,
+                        self.yyp[:,:,np.newaxis] - cube.dy/2.])
+        tmp = nrm_y.logcdf(tmp)
+        log_p_y = special.logsumexp(tmp.T, -1, b=[1.,-1.]).T
+        log_p_xy = log_p_x + log_p_y
+        log_p_xy = special.logsumexp(log_p_xy, -1)
+        log_normalisation = special.logsumexp(log_p_xy)
+        log_p_xy -= log_normalisation
+        log_p_xy -= np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_p_xy = np.broadcast_to(log_p_xy, (nt,)+log_p_xy.shape)
+        log_p_xy = np.moveaxis(log_p_xy, 0, -1)
+        self.log_p_x_t = log_p_xy
 
     def set_t_dep(self, t_dep=3.):
         """Set constant depletion timescale

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import stats
+from scipy import stats, special
 from . import parametric
 
 class GrowingDisk(parametric.ParametricComponent):
@@ -59,17 +59,18 @@ class GrowingDisk(parametric.ParametricComponent):
         q = q[:, np.newaxis, np.newaxis]
         rc = rc[:, np.newaxis, np.newaxis]
         alpha = alpha[:, np.newaxis, np.newaxis]
-        rr2 = self.xxp**2 + (self.yyp/q)**2
-        rr = rr2 ** 0.5
-        rho = (rr+rc) ** -alpha
-        total_mass_per_t = np.sum(rho * self.cube.dx * self.cube.dy, (1,2))
-        rho = (rho.T/total_mass_per_t).T
         self.x_t_pars = dict(q_lims=q_lims,
                              rc_lims=rc_lims,
                              alpha_lims=alpha_lims)
         # rearrange shape from [t,x,y] to match function signature [x,y,t]
-        rho = np.rollaxis(rho, 0, 3)
-        self.p_x_t = rho
+        rr2 = self.xxp**2 + (self.yyp/q)**2
+        rr = rr2 ** 0.5
+        log_rho = -alpha * np.log(rr+rc)
+        log_dx = np.log(self.cube.dx) + np.log(self.cube.dy)
+        log_normalisation = special.logsumexp(log_rho + log_dx, (1,2))
+        log_rho = (log_rho.T - log_normalisation).T
+        self.log_p_x_t = np.rollaxis(log_rho, 0, 3)
+        self.p_x_t = np.exp(self.log_p_x_t)
 
     def set_t_dep(self,
                   q=0.1,
