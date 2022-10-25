@@ -4,22 +4,25 @@ import numpy as np
 import popkinmocks as pkm
 from itertools import chain, combinations
 
-N_VELOCITY_BINS = 20
-VELOCITY_LIMIT = 900
-NX, NY = 5,6
+N_VELOCITY_BINS = 50
+VELOCITY_LIMIT = 1000
+NX, NY = 4,5
 
-def my_cube(nv=N_VELOCITY_BINS):
-    v_edg = np.linspace(-VELOCITY_LIMIT, VELOCITY_LIMIT, nv)
+def my_cube(nv=N_VELOCITY_BINS, nx=NX, ny=NY, vlim=VELOCITY_LIMIT):
+    v_edg = np.linspace(-vlim, vlim, nv)
     ssps = pkm.model_grids.milesSSPs()
     ssps.logarithmically_resample(dv=v_edg[1]-v_edg[0])
     ssps.calculate_fourier_transform()
     ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=NX, ny=NY, v_edg=v_edg)
+    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=nx, ny=ny, v_edg=v_edg)
     return cube
 
-def my_component(nv=N_VELOCITY_BINS, eval_ybar=True):
-    cube = my_cube(nv=nv)
-    gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0,0))
+@pytest.fixture(scope="module", name='my_cube')
+def my_cube_fixture():
+    return my_cube()
+
+def my_component(eval_ybar=True, cube=my_cube()):
+    gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0.2,0))
     gc1.set_p_t(lmd=2., phi=0.8)
     gc1.set_p_x_t(q_lims=(0.05, 0.5),
                   rc_lims=(1., 1.),
@@ -38,14 +41,13 @@ def my_component(nv=N_VELOCITY_BINS, eval_ybar=True):
                   sig_v_out_lims=(80., 60.))
     if eval_ybar:
         gc1.evaluate_ybar()
-    return cube, gc1
+    return gc1
 
 @pytest.fixture(scope="module", name='my_component')
-def my_component_fixture():
-    return my_component()
+def my_component_fixture(my_cube):
+    return my_component(my_cube)
 
-def my_second_component(nv=N_VELOCITY_BINS, eval_ybar=True):
-    cube = my_cube(nv=nv)
+def my_second_component(eval_ybar=True, cube=my_cube()):
     gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
@@ -70,11 +72,10 @@ def my_second_component(nv=N_VELOCITY_BINS, eval_ybar=True):
     return gc2
 
 @pytest.fixture(scope="module", name='my_second_component')
-def my_second_component_fixture():
-    return my_second_component()
+def my_second_component_fixture(my_cube):
+    return my_second_component(my_cube)
 
-def my_stream_component(nv=N_VELOCITY_BINS, eval_ybar=True):
-    cube = my_cube(nv=nv)
+def my_stream_component(eval_ybar=True, cube=my_cube()):
     stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
     stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
@@ -83,27 +84,40 @@ def my_stream_component(nv=N_VELOCITY_BINS, eval_ybar=True):
                      sig=0.1)
     stream.set_t_dep(t_dep=5.)
     stream.set_p_z_tx()
-    stream.set_mu_v(mu_v_lims=[-100,100])
+    stream.set_mu_v(mu_v_lims=[-80,100])
     stream.set_sig_v(sig_v=110.)
     if eval_ybar:
         stream.evaluate_ybar()
-    return cube, stream
+    return stream
 
 @pytest.fixture(scope="module", name='my_stream_component')
-def my_stream_component_fixture():
-    return my_stream_component()
+def my_stream_component_fixture(my_cube):
+    return my_stream_component(my_cube)
 
-def my_three_component_cube(nv=N_VELOCITY_BINS, eval_ybar=True):
-    cube, gc1 = my_component(nv=nv, eval_ybar=eval_ybar)
-    gc2 = my_second_component(nv=nv, eval_ybar=eval_ybar)
-    cube, stream = my_stream_component(nv=nv, eval_ybar=eval_ybar)
+def my_three_component_cube(eval_ybar=True, cube=my_cube()):
+    gc1 = my_component(eval_ybar=eval_ybar, cube=cube)
+    gc2 = my_second_component(eval_ybar=eval_ybar, cube=cube)
+    stream = my_stream_component(eval_ybar=eval_ybar, cube=cube)
     cube.combine_components([gc1, gc2, stream], [0.65, 0.25, 0.1])
     return cube
 
 @pytest.fixture(scope="module", name="my_three_component_cube")
-def my_three_component_cube_fixture():
-    cube = my_three_component_cube()
+def my_three_component_cube_fixture(my_cube):
+    cube = my_three_component_cube(my_cube)
     return cube
+
+def my_base_component(cube):
+    log_p_tvxz = cube.get_log_p('tvxz',
+                                density=True,
+                                light_weighted=False,
+                                collapse_cmps=True)
+    base_cmp = pkm.components.base.Component(cube=cube, log_p_tvxz=log_p_tvxz)
+    return base_cmp
+
+@pytest.fixture(scope="module", name="my_base_component")
+def my_base_component_fixture(my_three_component_cube):
+    base_cmp = my_base_component(my_three_component_cube)
+    return base_cmp
 
 def powerset(iterable):
     "powerset([1,2,3]) --> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"

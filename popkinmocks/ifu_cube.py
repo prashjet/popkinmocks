@@ -464,11 +464,50 @@ class IFUCube(object):
             for cmp in self.component_list
             ])
         is_conditional = '_' in which_dist
-        if is_conditional is False:
-            mean = np.sum(self.weights * mu_i.T, -1).T
+        if light_weighted:
+            rw = self.get_light_reweightings()
         else:
-            conditioners = which_dist.split('/')[1]
+            rw = np.ones(self.n_cmps)
+        if is_conditional is False:
+            mean = np.sum(self.weights * rw * mu_i.T, -1).T
+        else:
+            str_split = which_dist.split('_')
+            variable_to_mean = str_split[0]
+            conditioners = str_split[1]
+            # w_p_cond = self.get_p(
+            #     conditioners,
+            #     light_weighted=light_weighted,
+            #     collapse_cmps=False,
+            #     density=True)
+            # mean = np.sum(w_p_cond.T * rw * mu_i.T, -1).T / np.sum(w_p_cond, 0)
+            w_p_cond = np.array([
+                cmp.get_p(
+                    conditioners,
+                    light_weighted=light_weighted,
+                    density=True)
+                for cmp in self.component_list
+                ])
+            w_p_cond = (w_p_cond.T * self.weights).T
+            if variable_to_mean == 'x':
+                na = np.newaxis
+                w_p_cond = w_p_cond[:,na]
+            denom = self.get_p(
+                conditioners,
+                light_weighted=light_weighted,
+                collapse_cmps=True,
+                density=True)
+            mean = np.sum(w_p_cond.T * rw * mu_i.T, -1).T / denom
         return mean
+
+    def get_light_reweightings(self):
+        p_tz = self.get_p('tz', light_weighted=False, density=False)
+        p_tz_i = np.array([
+            cmp.get_p('tz', light_weighted=False, density=False)
+            for cmp in self.component_list
+            ])
+        lw = self.ssps.light_weights
+        reweightings = np.sum(lw*p_tz_i, (1,2))/np.sum(lw*p_tz)
+        return reweightings
 
     def get_central_moment(self, which_dist, j, light_weighted=False):
         """Get central moment or conditional central moment of a 1D distribution
@@ -486,19 +525,48 @@ class IFUCube(object):
             float/array: the central moment or conditional central moment
 
         """
+        # mu = self.get_mean(which_dist, light_weighted=light_weighted)
+        # k = np.arange(0, j+1, 1)
+        # j_choose_k = special.comb(j, k)
+        # moment = np.zeros_like(mu)
+        # for cmp_i, w_i in zip(self.component_list, self.weights):
+        #     mu_i = cmp_i.get_mean(which_dist, light_weighted=light_weighted)
+        #     muk_i = np.array([cmp_i.get_central_moment(
+        #         which_dist,
+        #         k0,
+        #         light_weighted=light_weighted) for k0 in k])
+        #     j_minus_k = np.broadcast_to(j-k, mu.shape+(j+1,))
+        #     j_minus_k = np.moveaxis(j_minus_k, -1, 0)
+        #     moment += w_i * np.sum((mu_i-mu)**j_minus_k * muk_i, 0)
         mu = self.get_mean(which_dist, light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        moment = np.zeros_like(mu)
-        for cmp_i, w_i in zip(self.component_list, self.weights):
-            mu_i = cmp_i.get_mean(which_dist, light_weighted=light_weighted)
-            muk_i = np.array([cmp_i.get_central_moment(
+        mu_i = np.array([
+            cmp_i.get_noncentral_moment(
                 which_dist,
-                k0,
-                light_weighted=light_weighted) for k0 in k])
-            j_minus_k = np.broadcast_to(j-k, mu.shape+(j+1,))
-            j_minus_k = np.moveaxis(j_minus_k, -1, 0)
-            moment += w_i * np.sum((mu_i-mu)**j_minus_k * muk_i, 0)
+                j,
+                mu,
+                light_weighted=light_weighted)
+            for cmp_i in self.component_list])
+        is_conditional = '_' in which_dist
+        if is_conditional is False:
+            mu_i = np.moveaxis(mu_i, 0, -1)
+            if light_weighted:
+                rw = self.get_light_reweightings()
+                moment = np.sum(self.weights * rw * mu_i, -1)
+            else:
+                moment = np.sum(self.weights * mu_i, -1)
+        else:
+            str_split = which_dist.split('_')
+            variable_to_mean = str_split[0]
+            conditioners = str_split[1]
+            w_p_cond = self.get_p(
+                conditioners,
+                light_weighted=light_weighted,
+                collapse_cmps=False,
+                density=True)
+            if variable_to_mean == 'x':
+                na = np.newaxis
+                w_p_cond = w_p_cond[:,na]
+            moment = np.sum(w_p_cond*mu_i, 0) / np.sum(w_p_cond, 0)
         return moment
 
     def get_variance(self, which_dist, light_weighted=False):

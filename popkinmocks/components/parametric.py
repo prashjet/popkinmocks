@@ -152,21 +152,8 @@ class ParametricComponent(base.Component):
             array
 
         """
-        # if light_weighted is False:
-        #     p_x_t = self.p_x_t.copy()
-        #     if density is False:
-        #         p_x_t *= (self.cube.dx * self.cube.dy)
-        # else:
-        #     p_txz = self.get_p_txz(density=density, light_weighted=True)
-        #     if density is True:
-        #         ssps = self.cube.ssps
-        #         p_txz = p_txz * ssps.delta_z
-        #     p_tx = np.sum(p_txz, -1)
-        #     p_t = self.get_p_t(density=density, light_weighted=True)
-        #     p_x_t = (p_tx.T/p_t).T
-        #     p_x_t = np.einsum('txy->xyt', p_x_t)
-        # return p_x_t
-        return np.exp(self.get_log_p_x_t(density=density, light_weighted=light_weighted))
+        lp = self.get_log_p_x_t(density=density, light_weighted=light_weighted)
+        return np.exp(lp)
 
 
     def get_log_p_x_t(self, density=True, light_weighted=False):
@@ -224,10 +211,8 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_v_tx = self.get_log_p_v_tx(
-            density=density,
-            light_weighted=light_weighted)
-        return np.exp(log_p_v_tx)
+        lp = self.get_log_p_v_tx(density=density, light_weighted=light_weighted)
+        return np.exp(lp)
 
     def get_log_p_v_tx(self, density=True, light_weighted=False):
         """Get log p(v|t,x)
@@ -352,20 +337,8 @@ class ParametricComponent(base.Component):
             array
 
         """
-        # if light_weighted is False:
-        #     p_z_tx = self.p_z_tx.copy()
-        # else:
-        #     p_txz = self.get_p_txz(density=True, light_weighted=True)
-        #     p_tx = self.get_p_tx(density=True, light_weighted=True)
-        #     p_z_tx = (p_txz.T/p_tx.T).T
-        #     p_z_tx = np.einsum('txyz->ztxy', p_z_tx)
-        # if density is False:
-        #     dz = self.cube.ssps.delta_z
-        #     na = np.newaxis
-        #     dz = dz[:, na, na, na]
-        #     p_z_tx *= dz
-        # return p_z_tx
-        return np.exp(self.get_log_p_z_tx(density=density, light_weighted=light_weighted))
+        lp = self.get_log_p_z_tx(density=density, light_weighted=light_weighted)
+        return np.exp(lp)
 
     def get_log_p_z_tx(self, density=True, light_weighted=False):
         """Get log p(z|t,x)
@@ -380,7 +353,6 @@ class ParametricComponent(base.Component):
             array
 
         """
-        # TODO: COMPLETE THIS!!!
         if light_weighted is False:
             log_p_z_tx = self.log_p_z_tx.copy() # = density
         else:
@@ -442,18 +414,8 @@ class ParametricComponent(base.Component):
             array
 
         """
-        # if light_weighted is False:
-        #     p_t = self.p_t.copy()
-        #     if density is False:
-        #         p_t *= self.cube.ssps.delta_t
-        # else:
-        #     p_tz = self.get_p_tz(density=False, light_weighted=True)
-        #     p_t = np.sum(p_tz, 1)
-        #     if density is True:
-        #         ssps = self.cube.ssps
-        #         p_t = p_t/ssps.delta_t
-        # return p_t
-        return np.exp(self.get_log_p_t(density=density, light_weighted=light_weighted))
+        lp = self.get_log_p_t(density=density, light_weighted=light_weighted)
+        return np.exp(lp)
 
     def get_log_p_t(self, density=True, light_weighted=False):
         """Get log p(t)
@@ -491,12 +453,8 @@ class ParametricComponent(base.Component):
             array
 
         """
-        # p_tvx = self.get_p_tvx(density=density, light_weighted=light_weighted)
-        # if density is True:
-        #     p_tvx *= self.cube.dx*self.cube.dy
-        # p_tv = np.sum(p_tvx, (-1,-2))
-        # return p_tv
-        return np.exp(self.get_log_p_tv(density=density, light_weighted=light_weighted))
+        lp = self.get_log_p_tv(density=density, light_weighted=light_weighted)
+        return np.exp(lp)
 
     def get_log_p_tv(self, density=True, light_weighted=False):
         """Get log p(t,v)
@@ -1130,90 +1088,6 @@ class ParametricComponent(base.Component):
         log_p_z = special.logsumexp(log_p_tz, 0)
         return log_p_z
 
-    # def get_p_v_x(self, density=True, light_weighted=False):
-    #     """Get p(v|x)
-    #
-    #     Args:
-    #         density (bool): whether to return probabilty density (True) or the
-    #         volume-element weighted probabilty (False)
-    #         light_weighted (bool): whether to return light-weighted (True) or
-    #         mass-weighted (False) quantity
-    #
-    #     Returns:
-    #         array
-    #
-    #     """
-    #     if light_weighted:
-    #         raise NotImplementedError
-    #     p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
-    #     P_t = self.get_p_t(density=False, light_weighted=False)
-    #     na = np.newaxis
-    #     p_v_x = np.sum((p_v_tx.T * P_t[na].T).T, 1)
-    #     return p_v_x
-    #
-    # def get_p_v_t(self, density=True, light_weighted=False):
-    #     """Get p(v|t)
-    #
-    #     Args:
-    #         density (bool): whether to return probabilty density (True) or the
-    #         volume-element weighted probabilty (False)
-    #         light_weighted (bool): whether to return light-weighted (True) or
-    #         mass-weighted (False) quantity
-    #
-    #     Returns:
-    #         array
-    #
-    #     """
-    #     if light_weighted:
-    #         raise NotImplementedError
-    #     p_v_tx = self.get_p_v_tx(density=density, light_weighted=False)
-    #     P_x = self.get_p_x(density=False, light_weighted=False)
-    #     na = np.newaxis
-    #     p_v_t = np.sum((p_v_tx.T * P_x[na,na].T).T, (2,3))
-    #     return p_v_t
-    #
-    # def get_p_z_x(self, density=True, light_weighted=False):
-    #     """Get p(z|x)
-    #
-    #     Args:
-    #         density (bool): whether to return probabilty density (True) or the
-    #         volume-element weighted probabilty (False)
-    #         light_weighted (bool): whether to return light-weighted (True) or
-    #         mass-weighted (False) quantity
-    #
-    #     Returns:
-    #         array
-    #
-    #     """
-    #     if light_weighted:
-    #         raise NotImplementedError
-    #     p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-    #     P_t = self.get_p_t(density=False, light_weighted=False)
-    #     na = np.newaxis
-    #     p_z_x = np.sum((p_z_tx.T * P_t[na].T).T, 1)
-    #     return p_z_x
-    #
-    # def get_p_z_t(self, density=True, light_weighted=False):
-    #     """Get p(z|t)
-    #
-    #     Args:
-    #         density (bool): whether to return probabilty density (True) or the
-    #         volume-element weighted probabilty (False)
-    #         light_weighted (bool): whether to return light-weighted (True) or
-    #         mass-weighted (False) quantity
-    #
-    #     Returns:
-    #         array
-    #
-    #     """
-    #     if light_weighted:
-    #         raise NotImplementedError
-    #     p_z_tx = self.get_p_z_tx(density=density, light_weighted=False)
-    #     P_x = self.get_p_x(density=False, light_weighted=False)
-    #     na = np.newaxis
-    #     p_z_t = np.sum((p_z_tx.T * P_x[na,na].T).T, (2,3))
-    #     return p_z_t
-
     def get_central_moment_v_tx(self, j, light_weighted=False):
         """Get j'th central moment of p(v|t,x)
 
@@ -1231,8 +1105,74 @@ class ParametricComponent(base.Component):
         else:
             return np.zeros_like(self.sig_v)
 
-    def get_central_moment_v_x(self, j, light_weighted=False):
+    def __get_noncentral_moment_v__(self, axes_to_sum, z_in_conditioners, P_int, j, mu, light_weighted=False):
+        """Short summary.
+
+        Args:
+            j (int): Description of parameter `j`.
+            mu (array): center to take moment about, broadcastable to shape
+                (nt,nx1,nx2)
+            P_int (array): probability weights to integrate over, broadcastable
+                to shape (nt,nx1,nx2)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            type: Description of returned object.
+
+        """
+        k = np.arange(0, j+1, 1)
+        j_choose_k = special.comb(j, k)
+        na = np.newaxis
+        kw_get_p = {'light_weighted':light_weighted, 'density':False}
+        if z_in_conditioners:
+            E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+            j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
+            del_mu = E_v_txz - mu
+            del_mu = del_mu[:,:,:,:,na]
+            P_int = P_int[:,:,:,:,na]
+            cent_moms = np.array([
+                self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
+                for k0 in k])
+        else:
+            E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+            j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
+            del_mu = E_v_tx - mu
+            del_mu = del_mu[:,:,:,na]
+            P_int = P_int[:,:,:,na]
+            cent_moms = np.array([
+                self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
+                for k0 in k])
+        cent_moms = np.moveaxis(cent_moms, 0, -1)
+        integrand = del_mu**j_minus_k * cent_moms * P_int
+        integral = np.sum(integrand, axes_to_sum)
+        moment = np.sum(j_choose_k * integral, -1)
+        return moment
+
+    def get_noncentral_moment_v_tx(self, j, mu, light_weighted=False):
+        """Get j'th noncentral moment of p(v|t,x) about arbitrary center mu
+
+        int v (v - mu(t,x))^j p(v|t,x) dx
+
+        Args:
+            mu (array): arbitrary moment center, broadcastable with (nt,nx,ny)
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt, nx1, nx2)
+
+        """
+        dtx = self.construct_volume_element('tx')
+        P_int = np.ones(dtx.shape)
+        moment = self.__get_noncentral_moment_v__((), False, P_int, j, mu, light_weighted=light_weighted)
+        return moment
+
+    def get_noncentral_moment_v_x(self, j, mu, light_weighted=False):
         """Get j'th central moment of p(v|x)
+
+        int (v - E(v|x))^j p(v|x) dv
 
         Args:
             j (int): which moment
@@ -1243,20 +1183,32 @@ class ParametricComponent(base.Component):
             array size (nx1, nx2)
 
         """
-        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        P_int = self.get_p('t_x', light_weighted=light_weighted, density=False)
+        moment = self.__get_noncentral_moment_v__((0,), False, P_int, j, mu, light_weighted=light_weighted)
+        return moment
+
+    def get_central_moment_v_x(self, j, light_weighted=False):
         E_v_x = self.get_mean_v_x(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
-        del_mu = E_v_tx - E_v_x
+        moment = self.get_noncentral_moment_v_x(j, E_v_x, light_weighted=light_weighted)
+        return moment
+
+    def get_noncentral_moment_v_t(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v|t)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nx1, nx2)
+
+        """
+        P_int = self.get_p('x_t', light_weighted=light_weighted, density=False)
+        P_int = np.moveaxis(P_int, -1, 0)
         na = np.newaxis
-        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
-        Pt = self.get_p('t', light_weighted=light_weighted, density=False)
-        moment = np.sum(Pt * sum_over_k.T, -1).T
+        mu = mu[:,na,na]
+        moment = self.__get_noncentral_moment_v__((1,2), False, P_int, j, mu, light_weighted=light_weighted)
         return moment
 
     def get_central_moment_v_t(self, j, light_weighted=False):
@@ -1271,23 +1223,15 @@ class ParametricComponent(base.Component):
             array size (nt,)
 
         """
-        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
         E_v_t = self.get_mean_v_t(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
         na = np.newaxis
-        del_mu = E_v_tx - E_v_t[:,na,na]
-        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
-        Px = self.get_p('x', light_weighted=light_weighted, density=False)
-        moment = np.sum(Px * sum_over_k, (-1,-2))
-        return moment
+        mom = self.get_noncentral_moment_v_t(
+            j,
+            E_v_t,
+            light_weighted=light_weighted)
+        return mom
 
-    def get_central_moment_v(self, j, light_weighted=False):
+    def get_noncentral_moment_v(self, j, mu, light_weighted=False):
         """Get j'th central moment of p(v)
 
         Args:
@@ -1299,20 +1243,45 @@ class ParametricComponent(base.Component):
             float
 
         """
-        E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
+        P_int = self.get_p('tx', light_weighted=light_weighted, density=False)
+        moment = self.__get_noncentral_moment_v__((0,1,2), False, P_int, j, mu, light_weighted=light_weighted)
+        return moment
+
+    def get_central_moment_v(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            float
+
+        """
         E_v = self.get_mean_v(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_tx.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_tx(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
-        del_mu = E_v_tx - E_v
-        na = np.newaxis
-        sum_over_k = np.sum(del_mu[:,:,:,na]**j_minus_k * normal_moments, -1)
-        Ptx = self.get_p('tx', light_weighted=light_weighted, density=False)
-        moment = np.sum(Ptx * sum_over_k)
+        moment = self.get_noncentral_moment_v(j, E_v, light_weighted=light_weighted)
+        return moment
+
+    def get_noncentral_moment_v_txz(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v|t,x,z)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            array size (nt,nx1,nx2,nz)
+
+        """
+        moment = self.get_noncentral_moment_v_tx(
+            j,
+            mu[:,:,:,0],    # E(v|t,x,z) = E(v|t,x,z0)
+            light_weighted=light_weighted)
+        nz = self.cube.ssps.delta_z.shape[0]
+        moment = np.broadcast_to(moment, (nz,)+moment.shape)
+        moment = np.moveaxis(moment, 0, -1)
         return moment
 
     def get_central_moment_v_txz(self, j, light_weighted=False):
@@ -1327,16 +1296,16 @@ class ParametricComponent(base.Component):
             array size (nt,nx1,nx2,nz)
 
         """
-        moment_v_tx = self.get_central_moment_v_tx(
+        moment = self.get_central_moment_v_tx(
             j,
             light_weighted=light_weighted)
         nz = self.cube.ssps.delta_z.shape[0]
-        moment_v_txz = np.broadcast_to(moment_v_tx, (nz,)+moment_v_tx.shape)
-        moment_v_txz = np.moveaxis(moment_v_txz, 0, -1)
-        return moment_v_txz
+        moment = np.broadcast_to(moment, (nz,)+moment.shape)
+        moment = np.moveaxis(moment, 0, -1)
+        return moment
 
-    def get_central_moment_v_tz(self, j, light_weighted=False):
-        """Get j'th central moment of p(v|t,z)
+    def get_noncentral_moment_v_tz(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
 
         Args:
             j (int): which moment
@@ -1344,27 +1313,34 @@ class ParametricComponent(base.Component):
             mass-weighted (False) quantity
 
         Returns:
-            array size (nt,nz)
+            float
 
         """
-        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        P_int = self.get_p('x_tz', light_weighted=light_weighted, density=False)
+        P_int = np.moveaxis(P_int, -2, 0)
+        na = np.newaxis
+        mu = mu[:,na,na,:]
+        moment = self.__get_noncentral_moment_v__((1,2), True, P_int, j, mu, light_weighted=light_weighted)
+        return moment
+
+    def get_central_moment_v_tz(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            float
+
+        """
         E_v_tz = self.get_mean_v_tz(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
-        na = np.newaxis
-        del_mu = E_v_txz - E_v_tz[:,na,na,:]
-        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
-        Px = self.get_p('x', light_weighted=light_weighted, density=False)
-        moment = np.sum(Px * sum_over_k, (1,2))
+        moment = self.get_noncentral_moment_v_tz(j, E_v_tz, light_weighted=light_weighted)
         return moment
 
-    def get_central_moment_v_xz(self, j, light_weighted=False):
-        """Get j'th central moment of p(v|x,z)
+    def get_noncentral_moment_v_xz(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
 
         Args:
             j (int): which moment
@@ -1372,27 +1348,16 @@ class ParametricComponent(base.Component):
             mass-weighted (False) quantity
 
         Returns:
-            array size (nx1,nx2,nz)
+            float
 
         """
-        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
-        E_v_xz = self.get_mean_v_xz(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
-        del_mu = E_v_txz - E_v_xz
-        na = np.newaxis
-        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
-        Pt = self.get_p('t', light_weighted=light_weighted, density=False)
-        moment = np.sum(Pt * sum_over_k, 0)
+        P_int = self.get_p('t_xz', light_weighted=light_weighted, density=False)
+        mu = mu[np.newaxis]
+        moment = self.__get_noncentral_moment_v__((0,), True, P_int, j, mu, light_weighted=light_weighted)
         return moment
 
-    def get_central_moment_v_z(self, j, light_weighted=False):
-        """Get j'th central moment of p(v|z)
+    def get_central_moment_v_xz(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
 
         Args:
             j (int): which moment
@@ -1400,23 +1365,45 @@ class ParametricComponent(base.Component):
             mass-weighted (False) quantity
 
         Returns:
-            array size (nz,)
+            float
 
         """
-        E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
+        E_v_tz = self.get_mean_v_xz(light_weighted=light_weighted)
+        moment = self.get_noncentral_moment_v_xz(j, E_v_tz, light_weighted=light_weighted)
+        return moment
+
+    def get_noncentral_moment_v_z(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            float
+
+        """
+        P_int = self.get_p('tx_z', light_weighted=light_weighted, density=False)
+        na = np.newaxis
+        mu = mu[na,na,na]
+        moment = self.__get_noncentral_moment_v__((0,1,2), True, P_int, j, mu, light_weighted=light_weighted)
+        return moment
+
+    def get_central_moment_v_z(self, j, mu, light_weighted=False):
+        """Get j'th central moment of p(v)
+
+        Args:
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+            mass-weighted (False) quantity
+
+        Returns:
+            float
+
+        """
         E_v_z = self.get_mean_v_z(light_weighted=light_weighted)
-        k = np.arange(0, j+1, 1)
-        j_choose_k = special.comb(j, k)
-        j_minus_k = np.broadcast_to(j-k, E_v_txz.shape+(j+1,))
-        normal_moments = np.array([
-            self.get_central_moment_v_txz(k0, light_weighted=light_weighted)
-            for k0 in k])
-        normal_moments = np.moveaxis(normal_moments, 0, -1)
-        del_mu = E_v_txz - E_v_xz
-        na = np.newaxis
-        sum_over_k = np.sum(del_mu[:,:,:,:,na]**j_minus_k * normal_moments, -1)
-        Ptx = self.get_p('tx', light_weighted=light_weighted, density=False)
-        moment = np.sum(Ptx * sum_over_k, (0,1,2))
+        moment = self.get_noncentral_moment_v_z(j, E_v_z, light_weighted=light_weighted)
         return moment
 
     def get_mean_v_tx(self, light_weighted=False):
@@ -1436,8 +1423,8 @@ class ParametricComponent(base.Component):
 
         """
         E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
-        P_t = self.get_p_t(light_weighted=light_weighted, density=False)
-        E_v_x = np.sum(E_v_tx.T*P_t, -1).T
+        P_t_x = self.get_p('t_x', light_weighted=light_weighted, density=False)
+        E_v_x = np.sum(E_v_tx * P_t_x, 0)
         return E_v_x
 
     def get_mean_v_t(self, light_weighted=False):
@@ -1448,9 +1435,10 @@ class ParametricComponent(base.Component):
 
         """
         E_v_tx = self.get_mean_v_tx(light_weighted=light_weighted)
-        P_x = self.get_p_x(light_weighted=light_weighted, density=False)
-        E_v_x = np.sum(E_v_tx*P_x, (1,2))
-        return E_v_x
+        P_x_t = self.get_p('x_t', light_weighted=light_weighted, density=False)
+        E_v_tx = np.moveaxis(E_v_tx, 0, -1)
+        E_v_t = np.sum(E_v_tx * P_x_t, (0,1))
+        return E_v_t
 
     def get_mean_v(self, light_weighted=False):
         """Get expectation E(v)
@@ -1485,9 +1473,12 @@ class ParametricComponent(base.Component):
 
         """
         E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
-        P_x = self.get_p_x(light_weighted=light_weighted, density=False)
+        P_x_tz = self.get_p('x_tz',
+                            light_weighted=light_weighted,
+                            density=False)
         na = np.newaxis
-        E_v_tz = np.sum(E_v_txz*P_x[na,:,:,na], (1,2))
+        E_v_txz = np.moveaxis(E_v_txz, 0, 2)
+        E_v_tz = np.sum(E_v_txz*P_x_tz, (0,1))
         return E_v_tz
 
     def get_mean_v_xz(self, light_weighted=False):
@@ -1498,9 +1489,10 @@ class ParametricComponent(base.Component):
 
         """
         E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
-        P_t = self.get_p_t(light_weighted=light_weighted, density=False)
-        na = np.newaxis
-        E_v_xz = np.sum(E_v_txz*P_t[:,na,na,na], 0)
+        P_t_xz = self.get_p('t_xz',
+                            light_weighted=light_weighted,
+                            density=False)
+        E_v_xz = np.sum(E_v_txz*P_t_xz, 0)
         return E_v_xz
 
     def get_mean_v_z(self, light_weighted=False):
@@ -1511,9 +1503,10 @@ class ParametricComponent(base.Component):
 
         """
         E_v_txz = self.get_mean_v_txz(light_weighted=light_weighted)
-        P_tz = self.get_p_tz(light_weighted=light_weighted, density=False)
-        na = np.newaxis
-        E_v_z = np.sum(E_v_txz*P_tz[:,na,na,:], (0,1,2))
+        P_tx_z = self.get_p('tx_z',
+                            light_weighted=light_weighted,
+                            density=False)
+        E_v_z = np.sum(E_v_txz*P_tx_z, (0,1,2))
         return E_v_z
 
     def plot_density(self,

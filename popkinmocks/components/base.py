@@ -273,10 +273,64 @@ class Component(object):
                                  np.sum(self.cube.y * p2.T, -1).T])
             return mean
         # if a mean method is hard coded for a component then use that instead
-        if hasattr(self, 'get_mean_'+which_dist):
+        method_string = 'get_mean_'+which_dist
+        if hasattr(self, method_string):
             get_mean = getattr(self, 'get_mean_'+which_dist)
         mean = get_mean(light_weighted=light_weighted)
         return mean
+
+    def get_noncentral_moment(self, which_dist, j, mu, light_weighted=False):
+        """Get central moment or conditional central moment of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output. Uses exact calculations if available for a given
+        distribution.
+
+        Args:
+            which_dist (string): which distribution to take central moment of.
+            mu (array): center about which to take moment about, with shape
+                broadcastable with conditioners of `which_dist` (if present)
+            j (int): which moment
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the central moment or conditional central moment
+
+        """
+        variable_to_mean = which_dist.split('_')[0]
+        assert len(variable_to_mean)==1
+        na = np.newaxis
+        def get_moment(light_weighted=light_weighted):
+            p = self.get_p(which_dist,
+                           light_weighted=light_weighted,
+                           density=False)
+            if variable_to_mean in ['t','v','z']:
+                val = self.cube.get_variable_values(variable_to_mean)
+                tmp = (np.power(val - mu[na].T, j) * p.T).T
+                moment = np.sum(tmp, 0)
+            else:
+                assert variable_to_mean == 'x'
+                # right now p = p(x1, x2 | ...) dx1 dx2 but we want
+                # p1 = p(x1 | ...) dx1 to get moment(x1) and
+                # p2 = p(x2 | ...) dx2 to get moment(x2)
+                p1 = np.sum(p, 1)
+                p2 = np.sum(p, 0)
+                x1 = self.cube.x
+                x2 = self.cube.y
+                mu1, mu2 = mu
+                tmp1 = np.power(x1 - mu1[na].T, j).T
+                tmp2 = np.power(x2 - mu2[na].T, j).T
+                moment = np.array([np.sum(tmp1 * p1, 0),
+                                   np.sum(tmp2 * p2, 0)])
+            return moment
+        # if a moment method is hard coded then use that instead
+        method_string = f'get_noncentral_moment_{which_dist}'
+        if hasattr(self, method_string):
+            get_moment = getattr(self, method_string)
+            get_moment = partial(get_moment, j, mu)
+        moment = get_moment(light_weighted=light_weighted)
+        return moment
 
     def get_central_moment(self, which_dist, j, light_weighted=False):
         """Get central moment or conditional central moment of a 1D distribution
@@ -296,40 +350,19 @@ class Component(object):
         """
         variable_to_mean = which_dist.split('_')[0]
         assert len(variable_to_mean)==1
-        na = np.newaxis
-        def get_moment(light_weighted=light_weighted):
-            p = self.get_p(which_dist,
-                           light_weighted=light_weighted,
-                           density=False)
-            if variable_to_mean in ['t','v','z']:
-                val = self.cube.get_variable_values(variable_to_mean)
-                mu = self.get_mean(which_dist, light_weighted=light_weighted)
-                tmp = (np.power(val - mu[na].T, j) * p.T).T
-                moment = np.sum(tmp, 0)
-            else:
-                assert variable_to_mean == 'x'
-                # right now p = p(x1, x2 | ...) dx1 dx2 but we want
-                # p1 = p(x1 | ...) dx1 to get moment(x1) and
-                # p2 = p(x2 | ...) dx2 to get moment(x2)
-                p1 = np.sum(p, 1)
-                p2 = np.sum(p, 0)
-                x1 = self.cube.x
-                x2 = self.cube.y
-                mu1, mu2 = self.get_mean(
-                    which_dist,
-                    light_weighted=light_weighted)
-                tmp1 = np.power(x1 - mu1[na].T, j).T
-                tmp2 = np.power(x2 - mu2[na].T, j).T
-                moment = np.array([np.sum(tmp1 * p1, 0),
-                                   np.sum(tmp2 * p2, 0)])
-            return moment
-        # if a moment method is hard coded then use that instead
-        method_string = f'get_central_moment_{which_dist}'
-        if hasattr(self, method_string):
-            print(f'using {method_string}')
-            get_moment = getattr(self, method_string)
-            get_moment = partial(get_moment, j)
-        moment = get_moment(light_weighted=light_weighted)
+        if variable_to_mean in ['t','v','z']:
+            mu = self.get_mean(which_dist, light_weighted=light_weighted)
+        else:
+            assert variable_to_mean == 'x'
+            mu1, mu2 = self.get_mean(
+                which_dist,
+                light_weighted=light_weighted)
+            mu = np.array([mu1, mu2])
+        is_conditional = '_' in which_dist
+        if is_conditional:
+            conditioners = which_dist.split('_')[1]
+            dc = self.construct_volume_element(conditioners)
+        moment = self.get_noncentral_moment(which_dist, j, mu, light_weighted=light_weighted)
         return moment
 
     def get_variance(self, which_dist, light_weighted=False):
@@ -473,7 +506,7 @@ class Component(object):
         F_s_w_tz = np.moveaxis(F_s_w_tz, -1, 0)
         F_s_w_tz = F_s_w_tz[:,:,na,na,:]
         # move v=0 to correct position for the FFT
-        p_tvxz = self.get_p_tvxz(density=True)
+        p_tvxz = self.get_p('tvxz', density=True, light_weighted=False)
         v = (v_edg[:-1]+v_edg[1:])/2.
         v0_idx = np.where(np.isclose(v, 0.))[0][0]
         p_tvxz = np.roll(p_tvxz, p_tvxz.shape[1]-v0_idx, axis=1)
@@ -549,7 +582,7 @@ class Component(object):
         log_p_tx = special.logsumexp(log_p_tvxz, (1,4))
         if density:
             log_p_tx -= np.log(self.construct_volume_element('tx'))
-        return p_tx
+        return log_p_tx
 
     def get_log_p_tz(self, density=True, light_weighted=False):
         """Get log p(t,z)
@@ -569,7 +602,7 @@ class Component(object):
         log_p_tz = special.logsumexp(log_p_tvxz, (1,2,3))
         if density:
             log_p_tz -= np.log(self.construct_volume_element('tz'))
-        return p_tz
+        return log_p_tz
 
     def get_log_p_tvx(self, density=True, light_weighted=False):
         """Get log p(t,v,x)
@@ -629,7 +662,7 @@ class Component(object):
         log_p_txz = special.logsumexp(log_p_tvxz, 1)
         if density:
             log_p_txz -= np.log(self.construct_volume_element('txz'))
-        return p_txz
+        return log_p_txz
 
     def get_log_p_tvxz(self, density=True, light_weighted=False):
         """Get log p(t,v,x,z)
@@ -645,8 +678,16 @@ class Component(object):
 
         """
         log_p_tvxz = copy.copy(self.log_p_tvxz)
-        if density is False:
-            log_p_tvxz += np.log(self.construct_volume_element('tvxz'))
+        log_dtvxz = np.log(self.construct_volume_element('tvxz'))
+        log_p_tvxz += log_dtvxz
+        if light_weighted:
+            na = np.newaxis
+            log_lw = np.log(self.cube.ssps.light_weights[:,na,na,na,:])
+            log_p_tvxz += log_lw
+            log_normalisation = special.logsumexp(log_p_tvxz)
+            log_p_tvxz -= log_normalisation
+        if density:
+            log_p_tvxz -= log_dtvxz
         return log_p_tvxz
 
     def get_log_p_v(self, density=True, light_weighted=False):
@@ -664,7 +705,7 @@ class Component(object):
         """
         log_p_tvxz = self.get_log_p_tvxz(density=False,
                                          light_weighted=light_weighted)
-        log_p_v = special.logsumexp(p_tvxz, (0,2,3,4))
+        log_p_v = special.logsumexp(log_p_tvxz, (0,2,3,4))
         if density:
             log_p_v -= np.log(self.construct_volume_element('v'))
         return log_p_v
