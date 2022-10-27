@@ -1074,10 +1074,10 @@ class ParametricComponent(base.Component):
             array size (nx1,nx2,nz)
 
         """
-        E_v_tz = self.get_mean_v_xz(light_weighted=light_weighted)
+        E_v_xz = self.get_mean_v_xz(light_weighted=light_weighted)
         moment = self.get_noncentral_moment_v_xz(
             j,
-            E_v_tz,
+            E_v_xz,
             light_weighted=light_weighted)
         return moment
 
