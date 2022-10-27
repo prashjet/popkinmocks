@@ -45,7 +45,13 @@ def test_normalisations(my_three_component_cube,
     for system in [cube, base_cmp]:
         for light_weighted in [False, True]:
             for density in [False, True]:
-                loop_over_dists(system, light_weighted, density, distribution_list)
+                loop_over_dists(
+                    system,
+                    light_weighted,
+                    density,
+                    distribution_list)
+    # above miss density evaluations for light-weighted parametric components
+    loop_over_dists(cube.component_list[0], True, True, distribution_list)
 
 def test_moments(my_three_component_cube,
                  my_base_component):
