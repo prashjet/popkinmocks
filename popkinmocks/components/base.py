@@ -280,7 +280,7 @@ class Component(object):
         return mean
 
     def get_noncentral_moment(self, which_dist, j, mu, light_weighted=False):
-        """Get central moment or conditional central moment of a 1D distribution
+        """Get noncentral moment of 1D distributions
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output. Uses exact calculations if available for a given
@@ -333,7 +333,7 @@ class Component(object):
         return moment
 
     def get_central_moment(self, which_dist, j, light_weighted=False):
-        """Get central moment or conditional central moment of a 1D distribution
+        """Get central moment of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output. Uses exact calculations if available for a given
@@ -362,11 +362,15 @@ class Component(object):
         if is_conditional:
             conditioners = which_dist.split('_')[1]
             dc = self.construct_volume_element(conditioners)
-        moment = self.get_noncentral_moment(which_dist, j, mu, light_weighted=light_weighted)
+        moment = self.get_noncentral_moment(
+            which_dist,
+            j,
+            mu,
+            light_weighted=light_weighted)
         return moment
 
     def get_variance(self, which_dist, light_weighted=False):
-        """Get variance or conditional variance of a 1D distribution
+        """Get variance of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output.
@@ -387,7 +391,7 @@ class Component(object):
         return variance
 
     def get_skewness(self, which_dist, light_weighted=False):
-        """Get skewness or conditional skewness of a 1D distribution
+        """Get skewness of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output.
@@ -413,7 +417,7 @@ class Component(object):
         return skewness
 
     def get_kurtosis(self, which_dist, light_weighted=False):
-        """Get kurtosis or conditional kurtosis of a 1D distribution
+        """Get kurtosis of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output.
@@ -439,7 +443,7 @@ class Component(object):
         return kurtosis
 
     def get_excess_kurtosis(self, which_dist, light_weighted=False):
-        """Get excess kurtosis or conditional ex-kurtosis of a 1D distribution
+        """Get excess kurtosis of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
         and meaning of output.
@@ -783,7 +787,8 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self.get_log_p_tvxz(density=False,
+                                         light_weighted=light_weighted)
         log_p_x = special.logsumexp(log_p_tvxz, (0,1,4))
         if density:
             log_p_x -= np.log(self.construct_volume_element('x'))
