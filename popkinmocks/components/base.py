@@ -4,26 +4,26 @@ import copy
 from functools import partial
 
 class Component(object):
-    """A galaxy component
+    """A galaxy component specified by the (log) joint density p(t,x,v,z)
 
-    A component is specified by it's log joint density log p(t,x,v,z) over
-    stellar age t, 2D position x, line-of-sight velocity v, and metallicity z.
-    Sub-classes of `Component` correspond to specific (i) factorisations of the
-    joint density and, (ii) implementations of the factors.
+    Sub-classes of `Component` correspond to specific choices of p(t,x,v,z).
+    Main methods are `get_p` to evaluate probability functions and `get_{X}`
+    for `X` in [`mean`, variance`, `skewness`, `kurtosis`] to evaluate moments.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
-        p_txvz (array): the 5D mass-weighted probabilty density p(t,x1,x2,v,z)
+        log_p_txvz (array): 5D array of natural log of mass-weighted probabilty
+            density p(t,x1,x2,v,z)
 
     """
     def __init__(self, cube=None, log_p_tvxz=None):
         self.cube = cube
-        dtvxz = self.construct_volume_element('tvxz')
-        if log_p_tvxz.shape==dtvxz.shape:
+        shape_tvxz = self.cube.get_distribution_shape('tvxz')
+        if log_p_tvxz.shape==shape_tvxz:
             self.log_p_tvxz = log_p_tvxz
         else:
             err = f'`log_p_tvxz` has shape {log_p_tvxz.shape} '
-            err += f'but should have shape {dtvxz.shape}'
+            err += f'but should have shape {shape_tvxz}'
             raise ValueError(err)
 
     def get_p(self,
@@ -176,54 +176,9 @@ class Component(object):
             # get the conditional probability (= nan if log_p_marginal = -inf)
             log_p_cond = log_p_joint - log_p_marginal
             if density:
-                dvol = self.construct_volume_element(which_dist)
+                dvol = self.cube.construct_volume_element(which_dist)
                 log_p_cond = log_p_cond - np.log(dvol)
         return log_p_cond
-
-    def construct_volume_element(self, which_dist):
-        """Construct volume element for converting densities to probabilties
-
-        Args:
-            which_dist (string): which density to evaluate
-
-        Returns:
-            array: The volume element with correct shape for `which_dist`
-
-        """
-        dist_is_conditional = '_' in which_dist
-        if dist_is_conditional:
-            dist_string, marginal_string = which_dist.split('_')
-            marginal_string = marginal_string.replace('x', 'xy')
-        else:
-            dist_string = which_dist
-        dist_string = dist_string.replace('x', 'xy')
-        count = 0
-        ndim = len(dist_string)
-        dvol = np.ones([1 for i in range(ndim)])
-        na = np.newaxis
-        slc = slice(0,None)
-        for var in dist_string:
-            if var=='t':
-                da = self.cube.ssps.delta_t
-            elif var=='v':
-                v_edg = self.cube.v_edg
-                da = v_edg[1:] - v_edg[:-1]
-            elif var=='x':
-                da = np.full(self.cube.nx, self.cube.dx)
-            elif var=='y':
-                da = np.full(self.cube.ny, self.cube.dy)
-            elif var=='z':
-                da = self.cube.ssps.delta_z
-            idx = tuple([na for i in range(count)])
-            idx = idx + (slc,)
-            idx = idx + tuple([na for i in range(ndim-count-1)])
-            dvol = dvol * da[idx]
-            count += 1
-        idx = tuple([slc for i in range(dvol.ndim)])
-        if dist_is_conditional:
-            idx = idx + tuple([na for i in range(len(marginal_string))])
-        dvol = dvol[idx]
-        return dvol
 
     def get_mean(self, which_dist, light_weighted=False):
         """Get mean or conditional mean of a 1D distribution
@@ -361,7 +316,7 @@ class Component(object):
         is_conditional = '_' in which_dist
         if is_conditional:
             conditioners = which_dist.split('_')[1]
-            dc = self.construct_volume_element(conditioners)
+            dc = self.cube.construct_volume_element(conditioners)
         moment = self.get_noncentral_moment(
             which_dist,
             j,
@@ -565,7 +520,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_tv = special.logsumexp(log_p_tvxz, (2,3,4))
         if density:
-            log_p_tv -= np.log(self.construct_volume_element('tv'))
+            log_p_tv -= np.log(self.cube.construct_volume_element('tv'))
         return log_p_tv
 
     def get_log_p_tx(self, density=True, light_weighted=False):
@@ -585,7 +540,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_tx = special.logsumexp(log_p_tvxz, (1,4))
         if density:
-            log_p_tx -= np.log(self.construct_volume_element('tx'))
+            log_p_tx -= np.log(self.cube.construct_volume_element('tx'))
         return log_p_tx
 
     def get_log_p_tz(self, density=True, light_weighted=False):
@@ -605,7 +560,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_tz = special.logsumexp(log_p_tvxz, (1,2,3))
         if density:
-            log_p_tz -= np.log(self.construct_volume_element('tz'))
+            log_p_tz -= np.log(self.cube.construct_volume_element('tz'))
         return log_p_tz
 
     def get_log_p_tvx(self, density=True, light_weighted=False):
@@ -625,7 +580,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_tvx = special.logsumexp(log_p_tvxz, 4)
         if density:
-            log_p_tvx -= np.log(self.construct_volume_element('tvx'))
+            log_p_tvx -= np.log(self.cube.construct_volume_element('tvx'))
         return log_p_tvx
 
     def get_log_p_tvz(self, density=True, light_weighted=False):
@@ -645,7 +600,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_tvz = special.logsumexp(log_p_tvxz, (2,3))
         if density:
-            log_p_tvz -= np.log(self.construct_volume_element('tvz'))
+            log_p_tvz -= np.log(self.cube.construct_volume_element('tvz'))
         return log_p_tvz
 
     def get_log_p_txz(self, density=True, light_weighted=False):
@@ -665,7 +620,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_txz = special.logsumexp(log_p_tvxz, 1)
         if density:
-            log_p_txz -= np.log(self.construct_volume_element('txz'))
+            log_p_txz -= np.log(self.cube.construct_volume_element('txz'))
         return log_p_txz
 
     def get_log_p_tvxz(self, density=True, light_weighted=False):
@@ -682,7 +637,7 @@ class Component(object):
 
         """
         log_p_tvxz = copy.copy(self.log_p_tvxz)
-        log_dtvxz = np.log(self.construct_volume_element('tvxz'))
+        log_dtvxz = np.log(self.cube.construct_volume_element('tvxz'))
         log_p_tvxz += log_dtvxz
         if light_weighted:
             na = np.newaxis
@@ -711,7 +666,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_v = special.logsumexp(log_p_tvxz, (0,2,3,4))
         if density:
-            log_p_v -= np.log(self.construct_volume_element('v'))
+            log_p_v -= np.log(self.cube.construct_volume_element('v'))
         return log_p_v
 
     def get_log_p_vx(self, density=True, light_weighted=False):
@@ -731,7 +686,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_vx = special.logsumexp(log_p_tvxz, (0,4))
         if density:
-            log_p_vx -= np.log(self.construct_volume_element('vx'))
+            log_p_vx -= np.log(self.cube.construct_volume_element('vx'))
         return log_p_vx
 
     def get_log_p_vz(self, density=True, light_weighted=False):
@@ -751,7 +706,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_vz = special.logsumexp(log_p_tvxz, (0,2,3))
         if density:
-            log_p_vz -= np.log(self.construct_volume_element('vz'))
+            log_p_vz -= np.log(self.cube.construct_volume_element('vz'))
         return log_p_vz
 
     def get_log_p_vxz(self, density=True, light_weighted=False):
@@ -771,7 +726,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_vxz = special.logsumexp(log_p_tvxz, 0)
         if density:
-            log_p_vxz -= np.log(self.construct_volume_element('vxz'))
+            log_p_vxz -= np.log(self.cube.construct_volume_element('vxz'))
         return log_p_vxz
 
     def get_log_p_x(self, density=True, light_weighted=False):
@@ -791,7 +746,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_x = special.logsumexp(log_p_tvxz, (0,1,4))
         if density:
-            log_p_x -= np.log(self.construct_volume_element('x'))
+            log_p_x -= np.log(self.cube.construct_volume_element('x'))
         return log_p_x
 
     def get_log_p_xz(self, density=True, light_weighted=False):
@@ -811,7 +766,7 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_xz = special.logsumexp(log_p_tvxz, (0,1))
         if density:
-            log_p_xz -= np.log(self.construct_volume_element('xz'))
+            log_p_xz -= np.log(self.cube.construct_volume_element('xz'))
         return log_p_xz
 
     def get_log_p_z(self, density=True, light_weighted=False):
@@ -831,5 +786,5 @@ class Component(object):
                                          light_weighted=light_weighted)
         log_p_z = special.logsumexp(log_p_tvxz, (0,1,2,3))
         if density:
-            log_p_z -= np.log(self.construct_volume_element('z'))
+            log_p_z -= np.log(self.cube.construct_volume_element('z'))
         return log_p_z

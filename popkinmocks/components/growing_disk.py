@@ -5,20 +5,19 @@ from . import parametric
 class GrowingDisk(parametric.ParametricComponent):
     """A growing disk with age-and-space dependent velocities and enrichments
 
-    The (mass-weighted) joint density of this component can be factorised as
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
-    where the factors are given by:
-    - p(t) : a beta distribution (see `set_p_t`)
+    The mass-weighted density factorises as
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+    - p(t) : beta distribution (see `set_p_t`),
     - p(x|t) : cored power-law in elliptical radius with age-varying core-size,
     flattening and slope (see `set_p_x_t`)
-    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where mean maps resemble
-    rotating disks (see `set_mu_v`) while dispersion varies as power-laws on
+    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where velocity mean resembles
+    a rotating disk (see `set_mu_v`) while dispersion varies as a power-law on
     elliptical radius (see `set_sig_v`)
     - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
-    enrichment (i.e. metallicity vs t) depends on depletion timescale t_dep(x)
-    varying as as power law in eliptical radius (see `set_t_dep`). The functions
-    mu_z(t,t_dep) and sig_z(t,t_dep) are taken from equations 3-10 of Zhu, van
-    de Venn, Leaman et al 20.
+    enrichment depends on a spatially varying depletion timescale t_dep(x) which
+    varies as as power law in eliptical radius (see `set_t_dep`). The functions
+    mu_z(t,t_dep) and sig_z(t,t_dep) are from equations 3-10 of Zhu et al. 20,
+    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -26,7 +25,6 @@ class GrowingDisk(parametric.ParametricComponent):
         rotation: angle (radians) between x-axes of component and cube.
 
     """
-
     def set_p_x_t(self,
                   q_lims=(0.5, 0.1),
                   rc_lims=(0.5, 0.1),

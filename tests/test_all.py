@@ -2,7 +2,8 @@ import pytest
 import numpy as np
 import popkinmocks as pkm
 
-def loop_over_dists(stellar_system,
+def loop_over_dists(cube,
+                    stellar_system,
                     light_weighted,
                     density,
                     distribution_list):
@@ -25,7 +26,7 @@ def loop_over_dists(stellar_system,
                 light_weighted=light_weighted,
                 density=density)
         if density:
-            dvol = stellar_system.construct_volume_element(dependent_vars)
+            dvol = cube.construct_volume_element(dependent_vars)
             p = (p.T * dvol.T).T
         total_prob = np.sum(p, tuple(range(n_dependent)))
         if is_conditional is False:
@@ -34,35 +35,41 @@ def loop_over_dists(stellar_system,
             # allow for nan in conditionals since denominator can be 0
             assert np.all(np.isclose(total_prob, 1.) | np.isnan(total_prob))
 
-def test_normalisations(my_three_component_cube,
+def test_normalisations(my_cube,
+                        my_galaxy,
                         distribution_list,
                         my_base_component):
     """Tests the normalisations of all densities evaluated for a component
 
     """
-    cube = my_three_component_cube
+    cube = my_cube
+    galaxy = my_galaxy
     base_cmp = my_base_component
-    for system in [cube, base_cmp]:
+    for system in [galaxy, base_cmp]:
         for light_weighted in [False, True]:
             for density in [False, True]:
                 loop_over_dists(
+                    cube,
                     system,
                     light_weighted,
                     density,
                     distribution_list)
     # above miss density evaluations for light-weighted parametric components
-    loop_over_dists(cube.component_list[0], True, True, distribution_list)
+    component1 = galaxy.component_list[0]
+    loop_over_dists(cube, component1, True, True, distribution_list)
 
-def test_moments(my_three_component_cube,
+def test_moments(my_cube,
+                 my_galaxy,
                  my_base_component):
     """Tests moments exact vs. numerical agree
 
     """
-    cube = my_three_component_cube
+    cube = my_cube
+    galaxy = my_galaxy
     base_cmp = my_base_component
     for lw in [False, True]:
         for dist in ['v_tx', 'v_x', 'v_t', 'v_tz', 'v_xz', 'v_z', 'v']:
-            a = cube.get_skewness(dist, light_weighted=lw)
+            a = galaxy.get_skewness(dist, light_weighted=lw)
             b = base_cmp.get_skewness(dist, light_weighted=lw)
             error = (a-b)/a
             median_error = np.nanmedian(np.abs(error))
@@ -71,21 +78,20 @@ def test_moments(my_three_component_cube,
             # is coarse (20 km/s) to allow for tests to run quickly
             assert median_error<0.06
         for dist in ['t', 'x', 'z', 't_x', 'x_tz', 'z_t']:
-            a = cube.get_kurtosis(dist, light_weighted=lw)
+            a = galaxy.get_kurtosis(dist, light_weighted=lw)
             b = base_cmp.get_kurtosis(dist, light_weighted=lw)
             error = (a-b)/a
             median_error = np.nanmedian(np.abs(error))
             print(dist, lw, median_error)
             assert median_error<1e-10
 
-def test_datacube(my_three_component_cube, my_base_component):
+def test_datacube(my_galaxy, my_base_component):
     """Tests datacubes agree
 
     """
-    cube = my_three_component_cube
+    galaxy = my_galaxy
     base_cmp = my_base_component
-    base_cmp.evaluate_ybar()
-    error = (cube.ybar - base_cmp.ybar)/cube.ybar
+    error = (galaxy.ybar - base_cmp.ybar)/galaxy.ybar
     assert np.median(np.abs(error)) < 0.0002
 
 

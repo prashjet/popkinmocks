@@ -3,30 +3,26 @@ from scipy import stats, special
 from . import parametric
 
 class Stream(parametric.ParametricComponent):
-    """A stream component with spatially varying kinematics but spatially uniform enrichment
+    """Stream with age-independent kinematics and spatially-uniform enrichment
 
-    The (mass-weighted) joint density of this component can be factorised as
-    p(t,x,v,z) = p(t) p(x) p(v|x) p(z|t)
-    where the factors are given by:
-    - p(t) : a beta distribution (see `set_p_t`),
-    - p(x) : a curved line with constant thickness (see `set_p_x`),
-    - p(v|x) = Normal(v ; mu_v(x), sig_v(x)) where mean varies linearly along
-    stream angle (see `set_mu_v`) and dispersion is constant (see `set_sig_v`)
-    - p(z|t) : single chemical evolution track i.. `t_dep` (see `set_p_z_t`).
-    - p(z|t) = Normal(z ; mu_z(t, t_dep), sig_z(t, t_dep) i.e. chemical
-    enrichment (i.e. metallicity vs t) depends on a single, spatially constant
-    depletion timescale t_dep (see `set_t_dep`). The functions mu_z(t,t_dep) and
-    sig_z(t,t_dep) are taken from equations 3-10 of Zhu, van de Venn, Leaman et
-    al 20.
+    The mass-weighted density factorises as
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+    - p(t) : beta distribution (see `set_p_t`),
+    - p(x|t) = p(x): a curved line with constant thickness (see `set_p_x`),
+    - p(v|t,x) = p(v|x) = Normal(v ; mu_v(x), sig_v(x)) where mean varies along
+    stream (see `set_mu_v`) and dispersion is constant (see `set_sig_v`)
+    - p(z|t,x) = p(z|t) = Normal(z ; mu_z(t, t_dep), sig_z(t, t_dep)) i.e.
+    chemical enrichment depends on a constant depletion timescale t_dep (see
+    `set_t_dep`). The functions mu_z(t,t_dep) and sig_z(t,t_dep) are from
+    equations 3-10 of Zhu et al. 20,
+    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
 
     Args:
         cube: a pkm.mock_cube.mockCube.
         center (x0,y0): co-ordinates of the component center.
         rotation: angle (radians) between x-axes of component and cube.
-        nsmp:
 
     """
-
     def set_p_x_t(self,
                   theta_lims=[0., np.pi/2.],
                   mu_r_lims=[0.7, 0.1],

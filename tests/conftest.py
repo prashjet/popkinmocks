@@ -7,6 +7,7 @@ from itertools import chain, combinations
 N_VELOCITY_BINS = 50
 VELOCITY_LIMIT = 1000
 NX, NY = 4,5
+EVAL_YBAR = True
 
 def my_cube(nv=N_VELOCITY_BINS, nx=NX, ny=NY, vlim=VELOCITY_LIMIT):
     v_edg = np.linspace(-vlim, vlim, nv)
@@ -21,7 +22,7 @@ def my_cube(nv=N_VELOCITY_BINS, nx=NX, ny=NY, vlim=VELOCITY_LIMIT):
 def my_cube_fixture():
     return my_cube()
 
-def my_component(eval_ybar=True, cube=my_cube()):
+def my_component(eval_ybar=EVAL_YBAR, cube=my_cube()):
     gc1 = pkm.components.GrowingDisk(cube=cube, rotation=0., center=(0.2,0))
     gc1.set_p_t(lmd=2., phi=0.8)
     gc1.set_p_x_t(q_lims=(0.05, 0.5),
@@ -47,7 +48,7 @@ def my_component(eval_ybar=True, cube=my_cube()):
 def my_component_fixture(my_cube):
     return my_component(my_cube)
 
-def my_second_component(eval_ybar=True, cube=my_cube()):
+def my_second_component(eval_ybar=EVAL_YBAR, cube=my_cube()):
     gc2 = pkm.components.GrowingDisk(cube=cube,
                                      rotation=np.deg2rad(10.),
                                      center=(0.05,-0.07))
@@ -75,7 +76,7 @@ def my_second_component(eval_ybar=True, cube=my_cube()):
 def my_second_component_fixture(my_cube):
     return my_second_component(my_cube)
 
-def my_stream_component(eval_ybar=True, cube=my_cube()):
+def my_stream_component(eval_ybar=EVAL_YBAR, cube=my_cube()):
     stream = pkm.components.Stream(cube=cube, rotation=0., center=(0.,0))
     stream.set_p_t(lmd=15., phi=0.3)
     stream.set_p_x_t(theta_lims=[-np.pi/2., 0.75*np.pi],
@@ -94,29 +95,36 @@ def my_stream_component(eval_ybar=True, cube=my_cube()):
 def my_stream_component_fixture(my_cube):
     return my_stream_component(my_cube)
 
-def my_three_component_cube(eval_ybar=True, cube=my_cube()):
+def my_galaxy(eval_ybar=EVAL_YBAR, cube=my_cube()):
     gc1 = my_component(eval_ybar=eval_ybar, cube=cube)
     gc2 = my_second_component(eval_ybar=eval_ybar, cube=cube)
     stream = my_stream_component(eval_ybar=eval_ybar, cube=cube)
-    cube.combine_components([gc1, gc2, stream], [0.65, 0.25, 0.1])
-    return cube
+    galaxy = pkm.components.Mixture(
+        cube=cube,
+        component_list=[gc1, gc2, stream],
+        weights=[0.65, 0.25, 0.1])
+    if eval_ybar:
+        galaxy.evaluate_ybar()
+    return galaxy
 
-@pytest.fixture(scope="module", name="my_three_component_cube")
-def my_three_component_cube_fixture(my_cube):
-    cube = my_three_component_cube(my_cube)
-    return cube
+@pytest.fixture(scope="module", name="my_galaxy")
+def my_galaxy_fixture(my_cube):
+    galaxy = my_galaxy(my_cube)
+    return galaxy
 
-def my_base_component(cube):
-    log_p_tvxz = cube.get_log_p('tvxz',
-                                density=True,
-                                light_weighted=False,
-                                collapse_cmps=True)
+def my_base_component(cube, galaxy, eval_ybar=EVAL_YBAR):
+    log_p_tvxz = galaxy.get_log_p(
+        'tvxz',density=True,
+        light_weighted=False,
+        collapse_cmps=True)
     base_cmp = pkm.components.base.Component(cube=cube, log_p_tvxz=log_p_tvxz)
+    if eval_ybar:
+        base_cmp.evaluate_ybar()
     return base_cmp
 
 @pytest.fixture(scope="module", name="my_base_component")
-def my_base_component_fixture(my_three_component_cube):
-    base_cmp = my_base_component(my_three_component_cube)
+def my_base_component_fixture(my_cube, my_galaxy):
+    base_cmp = my_base_component(my_cube, my_galaxy)
     return base_cmp
 
 def powerset(iterable):

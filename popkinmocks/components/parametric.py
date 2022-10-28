@@ -4,21 +4,20 @@ from abc import abstractmethod
 from . import base
 
 class ParametricComponent(base.Component):
-    """Abstract class to reprepsent parametrised galaxy components
+    """Abstract class for parametrised galaxy components
 
-    For these components the mass-weighted density factorises as
+    The mass-weighted density factorises as
     p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
-    - p(t) is a beta distribution,
-    - p(x|t) is some parameterised function where the component has a specified
-    `center` and `rotation` relative to the cube. Sub-classes should prvoide
-    specific implementations in their `set_p_x_t` method,
-    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)). Sub-classes should provide
+    - p(t) : beta distribution (see `set_p_t`),
+    - p(x|t) : function to be implemented in the `set_p_x_t` method of a
+    subclass, with the component `center` and `orientation` set at instantiation
+    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where subclasses provide
     specific implementations in their `set_mu_v` and `set_sig_v` methods,
     - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
-    enrichment (i.e. metallicity vs t) depends on a spatially varying depletion
-    timescale t_dep(x). The functions mu_z(t,t_dep) and sig_z(t,t_dep) are taken
-    from equations 3-10 of Zhu, van de Venn, Leaman et al 20. Sub-classes should
-    provide specific implementations in `set_t_dep` method.
+    enrichment depends on a spatially varying depletion timescale t_dep(x) to be
+    implemented in the `set_t_dep` method of subclass. The functions
+    mu_z(t,t_dep) and sig_z(t,t_dep) are from equations 3-10 of Zhu et al. 20,
+    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -127,7 +126,7 @@ class ParametricComponent(base.Component):
         log_cdf_t = beta.logcdf(t_edges)
         tmp = np.array([log_cdf_t[1:], log_cdf_t[:-1]])
         tmp = special.logsumexp(tmp.T, -1, [1,-1]).T
-        log_dt = np.log(self.construct_volume_element('t'))
+        log_dt = np.log(self.cube.construct_volume_element('t'))
         self.log_p_t = tmp - log_dt
         self.p_t = np.exp(self.log_p_t)
 
@@ -158,7 +157,7 @@ class ParametricComponent(base.Component):
             log_p_x_t = self.log_p_x_t.copy()
         else:
             log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
-            log_dz = np.log(self.construct_volume_element('z'))
+            log_dz = np.log(self.cube.construct_volume_element('z'))
             log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
             log_p_t = self.get_log_p_t(density=True, light_weighted=True)
             log_p_x_t = (log_p_tx.T - log_p_t).T
@@ -212,7 +211,7 @@ class ParametricComponent(base.Component):
             log_p_v_tx = log_p_tvx - log_p_tx[:,na,:,:]
             log_p_v_tx = np.moveaxis(log_p_v_tx, 0, 1)
         if density is True:
-            dv = self.construct_volume_element('v')
+            dv = self.cube.construct_volume_element('v')
             log_p_v_tx = (log_p_v_tx.T - np.log(dv)).T
         return log_p_v_tx
 
@@ -288,7 +287,7 @@ class ParametricComponent(base.Component):
         log_cdf_z_tx = nrm.logcdf(lin_z_edg)
         tmp = np.array([log_cdf_z_tx[1:], log_cdf_z_tx[:-1]])
         tmp = special.logsumexp(tmp.T, -1, b=[1,-1]).T
-        log_dz = np.log(self.construct_volume_element('z'))
+        log_dz = np.log(self.cube.construct_volume_element('z'))
         log_norm = special.logsumexp(tmp.T + log_dz, -1).T
         self.log_p_z_tx = tmp - log_norm
         self.p_z_tx = np.exp(self.log_p_z_tx)
@@ -310,12 +309,12 @@ class ParametricComponent(base.Component):
             log_p_z_tx = self.log_p_z_tx.copy() # = density
         else:
             log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
-            log_dz = np.log(self.construct_volume_element('z'))
+            log_dz = np.log(self.cube.construct_volume_element('z'))
             log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
             log_p_z_tx = (log_p_txz.T - log_p_tx.T).T
             log_p_z_tx = np.moveaxis(log_p_z_tx, -1, 0)
         if density is False:
-            log_dz = np.log(self.construct_volume_element('z'))
+            log_dz = np.log(self.cube.construct_volume_element('z'))
             log_p_z_tx = (log_p_z_tx.T + log_dz).T
         return log_p_z_tx
 
@@ -371,10 +370,10 @@ class ParametricComponent(base.Component):
             log_p_t = self.log_p_t.copy()
         else:
             log_p_tz = self.get_log_p_tz(density=True, light_weighted=True)
-            log_dz = np.log(self.construct_volume_element('z'))
+            log_dz = np.log(self.cube.construct_volume_element('z'))
             log_p_t = special.logsumexp(log_p_tz + log_dz, 1)
         if density is False:
-            log_p_t += np.log(self.construct_volume_element('t'))
+            log_p_t += np.log(self.cube.construct_volume_element('t'))
         return log_p_t
 
     def get_log_p_tv(self, density=True, light_weighted=False):
@@ -412,14 +411,16 @@ class ParametricComponent(base.Component):
 
         """
         if light_weighted is False:
-            log_p_x_t = self.get_log_p_x_t(density=density, light_weighted=False)
+            log_p_x_t = self.get_log_p_x_t(
+                density=density,
+                light_weighted=False)
             log_p_t = self.get_log_p_t(density=density, light_weighted=False)
             log_p_tx = log_p_x_t + log_p_t
             log_p_tx = np.moveaxis(log_p_tx, -1, 0)
         else:
             log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
             if density is True:
-                log_p_txz += np.log(self.construct_volume_element('z'))
+                log_p_txz += np.log(self.cube.construct_volume_element('z'))
             log_p_tx = special.logsumexp(log_p_txz, -1)
         return log_p_tx
 
@@ -467,7 +468,7 @@ class ParametricComponent(base.Component):
             log_p_tvxz = self.get_log_p_tvxz(density=density,
                                              light_weighted=True)
             if density is True:
-                log_p_tvxz += np.log(self.construct_volume_element('z'))
+                log_p_tvxz += np.log(self.cube.construct_volume_element('z'))
             log_p_tvx = special.logsumexp(log_p_tvxz, -1)
         return log_p_tvx
 
@@ -564,7 +565,7 @@ class ParametricComponent(base.Component):
         log_p_tvx = self.get_log_p_tvx(density=density,
                                        light_weighted=light_weighted)
         if density is True:
-            log_dt = np.log(self.construct_volume_element('t'))
+            log_dt = np.log(self.cube.construct_volume_element('t'))
             log_p_tvx = (log_p_tvx.T + log_dt).T
             log_p_tvx += np.log(self.cube.dx) + np.log(self.cube.dy)
         log_p_tvx = special.logsumexp(log_p_tvx, (0,2,3))
@@ -587,7 +588,7 @@ class ParametricComponent(base.Component):
             density=density,
             light_weighted=light_weighted)
         if density is True:
-            log_dt = np.log(self.construct_volume_element('t'))
+            log_dt = np.log(self.cube.construct_volume_element('t'))
             log_p_tvx = (log_p_tvx.T + log_dt).T
         log_p_tvx = special.logsumexp(log_p_tvx, 0)
         return log_p_tvx
@@ -625,9 +626,11 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=density, light_weighted=light_weighted)
+        log_p_tvxz = self.get_log_p_tvxz(
+            density=density,
+            light_weighted=light_weighted)
         if density:
-            log_dt = np.log(self.construct_volume_element('t'))
+            log_dt = np.log(self.cube.construct_volume_element('t'))
             log_p_tvxz = (log_p_tvxz.T + log_dt).T
         log_p_vxz = special.logsumexp(log_p_tvxz, 0)
         return log_p_vxz
@@ -652,7 +655,7 @@ class ParametricComponent(base.Component):
         else:
             log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
             if density is True:
-                log_dtdz = np.log(self.construct_volume_element('tz'))
+                log_dtdz = np.log(self.cube.construct_volume_element('tz'))
                 na = np.newaxis
                 log_p_txz += log_dtdz[:,na,na,:]
             log_p_x = special.logsumexp(log_p_txz, (0,3))
@@ -674,7 +677,7 @@ class ParametricComponent(base.Component):
         log_p_txz = self.get_log_p_txz(density=density,
                                        light_weighted=light_weighted)
         if density:
-            log_dt = np.log(self.construct_volume_element('t'))
+            log_dt = np.log(self.cube.construct_volume_element('t'))
             log_p_txz = (log_p_txz.T + log_dt).T
         log_p_xz = special.logsumexp(log_p_txz, 0)
         return log_p_xz
@@ -695,7 +698,7 @@ class ParametricComponent(base.Component):
         log_p_tz = self.get_log_p_tz(density=density,
                                      light_weighted=light_weighted)
         if density:
-            log_dt = np.log(self.construct_volume_element('t'))
+            log_dt = np.log(self.cube.construct_volume_element('t'))
             log_p_tz = (log_p_tz.T + log_dt).T
         log_p_z = special.logsumexp(log_p_tz, 0)
         return log_p_z
@@ -782,7 +785,7 @@ class ParametricComponent(base.Component):
             array size (nt, nx1, nx2)
 
         """
-        dtx = self.construct_volume_element('tx')
+        dtx = self.cube.construct_volume_element('tx')
         P_int = np.ones(dtx.shape)
         moment = self.__get_noncentral_moment_v__(
             (),
