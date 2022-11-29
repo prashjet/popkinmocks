@@ -5,4 +5,4 @@
 
 Create mock IFU datacubes for stellar population and kinematic modelling.
 
-Full documentation coming soon. See the Jupyter notebook `docs/notebooks/popkinmocks.ipynb` for a basic example.
+Full documentation coming soon. See the Jupyter notebook `docs/source/notebooks/popkinmocks.ipynb` for a basic example.
