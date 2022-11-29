@@ -20,9 +20,11 @@ class IFUCube(object):
                  ssps=None,
                  nx=300,
                  ny=299,
+                 nv=200,
                  xrng=(-1,1),
                  yrng=(-1,1),
-                 v_edg=np.linspace(-1000, 1000, 201)):
+                 vrng=(-1000,1000)
+                 ):
         self.ssps = ssps
         self.nx = nx
         self.ny = ny
@@ -36,7 +38,11 @@ class IFUCube(object):
         xx, yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.xx = xx
         self.yy = yy
-        self.v_edg = v_edg
+        self.v_edg = np.linspace(*vrng, nv+1)
+        dv = self.v_edg[1] - self.v_edg[0]
+        self.ssps.logarithmically_resample(dv=dv)
+        self.ssps.calculate_fourier_transform()
+        self.ssps.get_light_weights()
 
     def add_noise(self, snr=100.):
         """Add noise with SNR which is constant with position and wavelength

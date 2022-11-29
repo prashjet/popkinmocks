@@ -4,18 +4,19 @@ import numpy as np
 import popkinmocks as pkm
 from itertools import chain, combinations
 
-N_VELOCITY_BINS = 50
+N_VELOCITY_BINS = 49
 VELOCITY_LIMIT = 1000
 NX, NY = 4,5
 EVAL_YBAR = True
 
 def my_cube(nv=N_VELOCITY_BINS, nx=NX, ny=NY, vlim=VELOCITY_LIMIT):
-    v_edg = np.linspace(-vlim, vlim, nv)
     ssps = pkm.model_grids.milesSSPs()
-    ssps.logarithmically_resample(dv=v_edg[1]-v_edg[0])
-    ssps.calculate_fourier_transform()
-    ssps.get_light_weights()
-    cube = pkm.ifu_cube.IFUCube(ssps=ssps, nx=nx, ny=ny, v_edg=v_edg)
+    cube = pkm.ifu_cube.IFUCube(
+        ssps=ssps,
+        nx=nx,
+        ny=ny,
+        nv=nv,
+        vrng=(-vlim,vlim))
     return cube
 
 @pytest.fixture(scope="module", name='my_cube')
