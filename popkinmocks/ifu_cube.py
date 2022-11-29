@@ -221,35 +221,112 @@ class IFUCube(object):
         shape = tuple(shape)
         return shape
 
+    def get_axis_label(self, which_dist):
+        """
+        Args:
+            which_variable (string): which variable, one of v, x1, x2, t or z.
+
+        Returns:
+            string: th
+
+        """
+        if which_dist=='x1':
+            lab = '$x_1$'
+        elif which_dist=='x2':
+            lab = '$x_2$'
+        elif which_dist=='t':
+            lab = '$t$ [Gyr]'
+        elif which_dist=='z':
+            lab = '$z$ [Z/H]'
+        elif which_dist=='v':
+            lab = '$v$ [km/s]'
+        else:
+            raise ValueError('Unknown `which_dist`')
+        return lab
+
+    def get_ticks(self, which_dist):
+        """
+        Args:
+            which_variable (string): which variable, one of v, x1, x2, t or z.
+
+        Returns:
+            string: th
+
+        """
+        if which_dist=='x1':
+            ticks = 'default'
+        elif which_dist=='x2':
+            ticks = 'default'
+        elif which_dist=='t':
+            tick_pos = self.ssps.img_t_ticks
+            tick_lab = self.ssps.t_ticks
+            ticks = (tick_pos, tick_lab)
+        elif which_dist=='z':
+            tick_pos = self.ssps.img_z_ticks
+            tick_lab = self.ssps.z_ticks
+            ticks = (tick_pos, tick_lab)
+        elif which_dist=='v':
+            ticks = 'default'
+        else:
+            raise ValueError('Unknown `which_dist`')
+        return ticks
+
+    def get_extent(self, which_dist):
+        """
+        Args:
+            which_variable (string): which variable, one of v, x1, x2, t or z.
+
+        Returns:
+            string: th
+
+        """
+        if which_dist=='x1':
+            ext = self.xrng
+        elif which_dist=='x2':
+            ext = self.yrng
+        elif which_dist=='t':
+            edges = self.ssps.par_edges[1]
+            ext = (edges[0], edges[-1])
+        elif which_dist=='z':
+            edges = self.ssps.par_edges[0]
+            ext = (edges[0], edges[-1])
+        elif which_dist=='v':
+            ext = (self.v_edg[0], self.v_edg[-1])
+        else:
+            raise ValueError('Unknown `which_dist`')
+        return ext
+
     def imshow(self,
                img,
                ax=None,
                label_ax=True,
                colorbar=True,
                colorbar_label='',
-               **kw_imshow):
-        """Plot an image
-
-        Wrapper around `plt.imshow` which correctly aligns and rotates the image
+               view=['x1', 'x2'],
+               **kwargs):
+        """Wrapper around `plt.imshow` to orient image and label axes
 
         Args:
-            img : the 2D image array
-            ax : a `matplotlib` `axis` object
-            label_ax (bool): whether to include axes tick marks and labels
-            colorbar (bool):  whether to include a colorbar
-            colorbar_label (string): the colorbar label
-            **kw_imshow (dict): extra keyword parameters passed to `plt.imshow`
+            img (array): 2D image to show
+            ax: a `matplotlib` `axis` object
+            label_ax (bool): whether to show tick marks and labels
+            colorbar (bool):  whether to show colorbar
+            colorbar_label (string): colorbar label
+            view (list): list of two strings amongst ['t','v','x1','x2','z']
+                representing the variables on the x- and y- axes of the image 
+            **kwargs: keyword arguments passed to `plt.imshow` (must not
+                include `extent`)
 
         Returns:
             a `matplotlib` `AxesImage` object
 
         """
-        img = np.flipud(img.T)
-        kw_imshow0 = {'extent':self.xrng + self.yrng}
-        kw_imshow0.update(kw_imshow)
         if ax is None:
             ax = plt.gca()
-        img = ax.imshow(img, **kw_imshow0)
+        img = np.flipud(img.T)
+        extent = self.get_extent(view[0])
+        extent += self.get_extent(view[1])
+        img = ax.imshow(img, extent=extent, **kwargs)
         if colorbar:
             cbar = plt.colorbar(img)
             cbar.set_label(colorbar_label)
@@ -257,6 +334,49 @@ class IFUCube(object):
             ax.set_xticks([])
             ax.set_yticks([])
         else:
-            ax.set_xlabel('$x_1$')
-            ax.set_ylabel('$x_2$')
-        return img
+            for i, xy in enumerate(['x', 'y']):
+                ticks = self.get_ticks(view[i])
+                if ticks != 'default':
+                    tick_pos, tick_labs = ticks
+                    getattr(ax, f'set_{xy}ticks')(tick_pos)
+                    getattr(ax, f'set_{xy}ticklabels')(tick_labs)
+                ax_lab = self.get_axis_label(view[i])
+                getattr(ax, f'set_{xy}label')(ax_lab)
+        return ax
+
+    def plot(self, which_var, arr, *args, ax=None, xspacing='physical', **kwargs):
+        """Wrapper around `plt.plot` to label axis
+
+        Args:
+            which_var (string): x-axis variable, one of ['t','v','x1','x2','z'] 
+            arr (array): y-axis data to plot
+            *args: any extra 
+            label_ax (bool): whether to show tick marks and labels
+            colorbar (bool):  whether to show colorbar
+            colorbar_label (string): colorbar label
+            view (list): list of two strings amongst ['t','v','x1','x2','z']
+                representing the variables on the x- and y- axes of the image 
+            **kw_imshow (dict): extra keyword parameters passed to `plt.imshow`
+
+        Returns:
+            a `matplotlib` `AxesImage` object
+
+        """
+        if ax is None:
+            ax = plt.gca()
+        if xspacing=='physical':
+            x = self.get_variable_values(which_var)
+            extent = 'default'
+            ticks = 'default'
+        elif xspacing=='discrete':
+            x = np.linspace(0, 1, arr.size)
+            extent = self.get_extent(which_var)
+            ticks = self.get_ticks(which_var)
+        img = ax.plot(x, arr, *args, **kwargs)
+        if ticks!='default':
+            tick_pos, tick_labs = ticks
+            ax.set_xticks(tick_pos)
+            ax.set_xticklabels(tick_labs)
+        ax_lab = self.get_axis_label(which_var)
+        ax.set_xlabel(ax_lab)
+        return ax
