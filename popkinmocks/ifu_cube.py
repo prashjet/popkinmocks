@@ -11,9 +11,10 @@ class IFUCube(object):
         ssps : SSP templates in a `pkm.model_grids.milesSSPs` object
         nx (int): number of pixels in x-dimension
         ny (int): number of pixels in y-dimension
+        ny (int): number of velocity bins
         xrng (tuple): start/end co-ordinates in x-direction
         yrng (tuple): start/end co-ordinates in x-direction
-        v_edg (array): velocity bin edges
+        vrng (tuple): start/end velocities in km/s
 
     """
     def __init__(self,
@@ -313,7 +314,7 @@ class IFUCube(object):
             colorbar (bool):  whether to show colorbar
             colorbar_label (string): colorbar label
             view (list): list of two strings amongst ['t','v','x1','x2','z']
-                representing the variables on the x- and y- axes of the image 
+                representing the variables on the x- and y- axes of the image
             **kwargs: keyword arguments passed to `plt.imshow` (must not
                 include `extent`)
 
@@ -348,14 +349,14 @@ class IFUCube(object):
         """Wrapper around `plt.plot` to label axis
 
         Args:
-            which_var (string): x-axis variable, one of ['t','v','x1','x2','z'] 
+            which_var (string): x-axis variable, one of ['t','v','x1','x2','z']
             arr (array): y-axis data to plot
-            *args: any extra 
+            *args: any extra
             label_ax (bool): whether to show tick marks and labels
             colorbar (bool):  whether to show colorbar
             colorbar_label (string): colorbar label
             view (list): list of two strings amongst ['t','v','x1','x2','z']
-                representing the variables on the x- and y- axes of the image 
+                representing the variables on the x- and y- axes of the image
             **kw_imshow (dict): extra keyword parameters passed to `plt.imshow`
 
         Returns:
