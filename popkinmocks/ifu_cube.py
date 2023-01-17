@@ -9,31 +9,30 @@ class IFUCube(object):
 
     Args:
         ssps : SSP templates in a `pkm.model_grids.milesSSPs` object
-        nx (int): number of pixels in x-dimension
-        ny (int): number of pixels in y-dimension
-        ny (int): number of velocity bins
-        xrng (tuple): start/end co-ordinates in x-direction
-        yrng (tuple): start/end co-ordinates in x-direction
+        nx1 (int): number of pixels in x1
+        nx2 (int): number of pixels in x2
+        nv (int): number of velocity bins
+        x1rng (tuple): start/end co-ordinates in x1 (arbitrary units)
+        x2rng (tuple): start/end co-ordinates in x2 (arbitrary units)
         vrng (tuple): start/end velocities in km/s
 
     """
     def __init__(self,
                  ssps=None,
-                 nx=300,
-                 ny=299,
+                 nx1=300,
+                 nx2=299,
                  nv=200,
-                 xrng=(-1,1),
-                 yrng=(-1,1),
+                 x1rng=(-1,1),
+                 x2rng=(-1,1),
                  vrng=(-1000,1000)
                  ):
         self.ssps = ssps
-        self.nx = nx
-        self.ny = ny
-        self.xrng = xrng
-        self.yrng = yrng
-        self.x = np.linspace(*xrng, nx)
-        # flip y array to be compatible with plt.imshow
-        self.y = np.linspace(*yrng, ny)
+        self.nx = nx1
+        self.ny = nx2
+        self.x1rng = x1rng
+        self.x2rng = x2rng
+        self.x = np.linspace(*x1rng, nx1)
+        self.y = np.linspace(*x2rng, nx2)
         self.dx = self.x[1] - self.x[0]
         self.dy = self.y[1] - self.y[0]
         xx, yy = np.meshgrid(self.x, self.y, indexing='ij')
@@ -107,8 +106,8 @@ class IFUCube(object):
         np.savez(direc + fname,
                  nx1=self.nx,
                  nx2=self.ny,
-                 x1rng=self.xrng,
-                 x2rng=self.yrng,
+                 x1rng=self.x1rng,
+                 x2rng=self.x2rng,
                  S=self.ssps.Xw.reshape((-1,)+self.ssps.par_dims),
                  w=self.ssps.w,
                  z_bin_edges=self.ssps.par_edges[0],
@@ -201,10 +200,10 @@ class IFUCube(object):
         return n
 
     def get_distribution_shape(self, which_dist):
-        """Get values of the variable v, x1, x2, t or z.
+        """Get shape of a distribution given its string
 
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_dist (string): a valid distribution string.
 
         Returns:
             array: the discretisation values used for this variable
@@ -282,9 +281,9 @@ class IFUCube(object):
 
         """
         if which_dist=='x1':
-            ext = self.xrng
+            ext = self.x1rng
         elif which_dist=='x2':
-            ext = self.yrng
+            ext = self.x2rng
         elif which_dist=='t':
             edges = self.ssps.par_edges[1]
             ext = (edges[0], edges[-1])

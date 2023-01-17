@@ -9,12 +9,12 @@ VELOCITY_LIMIT = 1000
 NX, NY = 4,5
 EVAL_YBAR = True
 
-def my_cube(nv=N_VELOCITY_BINS, nx=NX, ny=NY, vlim=VELOCITY_LIMIT):
+def my_cube(nv=N_VELOCITY_BINS, nx1=NX, nx2=NY, vlim=VELOCITY_LIMIT):
     ssps = pkm.model_grids.milesSSPs()
     cube = pkm.ifu_cube.IFUCube(
         ssps=ssps,
-        nx=nx,
-        ny=ny,
+        nx1=nx1,
+        nx2=nx2,
         nv=nv,
         vrng=(-vlim,vlim))
     return cube
