@@ -11,9 +11,9 @@ kernelspec:
   name: python3
 ---
 
-# Getting started
+# Background
 
-Some basic background 
+Some basic background.
 
 ## Stellar populations and kinematics
 
@@ -97,13 +97,20 @@ where $\tilde{p}$ and $\tilde{S}$ are re-labellings of $p$ and $S$ (see Section 
 
 ## Discretisation
 
+The discretisation in age and metallicity is set by the SSP models; there are various options when instantiating SSP models to modify the range and sampling of these parameters. Discretisation in the spatial dimensions $(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
 
 ```{code-cell}
 cube = pkm.ifu_cube.IFUCube(
   ssps=ssps, 
-  nx=25, 
-  ny=25, 
-  nv=50, 
-  vrng=(-1000,1000))
+  nx1=20, x1rng=(-1,1),      # arbitrary units
+  nx2=21, x2rng=(-1,1),      # arbitrary units
+  nv=30, vrng=(-1000,1000)   # km/s
+)
 cube.get_distribution_shape('tvxz')
+```
+
+This shape corresponds to the size of each variable in the string `tvxz` i.e. $(t, v, x_1, x_2, z)$. To get the values of, say, metallicity:
+
+```{code-cell}
+cube.get_variable_values('z')
 ```
