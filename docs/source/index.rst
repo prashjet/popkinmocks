@@ -20,7 +20,7 @@ User Guide
 
    user/install
    user/citation.md
-   user/getting_started.md
+   user/background.md
    user/constructing_models.md
    user/derived_properties.md
    user/datacube_noise.md

@@ -46,13 +46,17 @@ _ = plt.gca().set_xlabel('Wavelength [Ang.]')
 _ = plt.gca().set_ylabel('Flux')
 ```
 
-Stellar kinematics refer to the velocities and positions of stars within a galaxy. By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$, we can capture all relations between these four variables without imposing simplifying assumptions. One such assumption which is commonly used when modelling observed spectra is that at a fixed position, velocities and stellar populations are independent. This statement is equivalent to the equation:
+Stellar kinematics refer to the velocities and positions of stars within a galaxy. By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$, we can capture all relations between these four variables without imposing simplifying assumptions. One such assumption which is commonly used when modelling observed spectra is that at a fixed position, velocities and stellar populations are independent. This statement is equivalent to the factorisation:
 
 $$
-p(t, v, \textbf{x}, z) = p(x) p(v|\textbf{x}) p(t,z|\textbf{x})
+p(t, v, \textbf{x}, z) = p(\textbf{x}) p(v|\textbf{x}) p(t,z|\textbf{x})
+\tag{1}
+\label{eq:factor_p}
 $$
 
-which factorises the joint distribution into marginal and conditional terms, where velocities and populations only interact via their dependence on position.
+which says that velocities and stellar populations only interact via their dependence on position.
+
+The four variables $(t, v, \mathbf{x}, z)$ form incomplete description of the stellar population and kinematics of galaxies. Several quantities are missing: two components of velocity, one position, and several chemical tags which go beyond a single metallicity (e.g. alpha abundances, or individual elemental abundances). However, for the vast majority of galaxies in the Universe, the data we can measure limits us to considering only $(t, v, \mathbf{x}, z)$.
 
 ## IFU datacubes
 
@@ -63,7 +67,7 @@ $$
   y(\textbf{x}, \lambda) = \int \int \int 
     \frac{1}{1+v/c} p(t, v, \textbf{x}, z) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
     \; \mathrm{d}t \; \mathrm{d}v \; \mathrm{d}z
-  \tag{1}
+  \tag{2}
   \label{eq:fwdmod}
 \end{equation}
 $$
@@ -73,11 +77,30 @@ where we have introduced notation for the:
 * spectrum of SSP with age $t$ and metallicity $z$, $S(\lambda ; t, z)$, and
 * speed of light, $c$.
 
-The two factors of $(1+v/c)$ ain this equation rise from Doppler-shifting of light: the factor inside $S$ translates from rest- to observed-wavelengths given a LOS velocity $v$, while the pre-factor of scales the flux to ensure total luminosity is conserved. The integrals over $t$ and $z$ allow the 
+The two factors of $(1+v/c)$ in this equation arise from Doppler-shifting of light: the factor inside $S$ translates from the rest-frame to observed wavelengths given a LOS velocity $v$, while the pre-factor scales the flux, ensuring total luminosity is conserved.
+
+What happens if we insert the simplifying assumption shown in $\eqref{eq:factor_p}$ into equation $\eqref{eq:fwdmod}$? In this case, the integral can be factored as follows
+
+$$
+\begin{equation}
+  y(\textbf{x}, \lambda) = 
+    p(\textbf{x})
+    \left[
+      \int \int p(t,z|\textbf{x}) \; \mathrm{d}t \; \mathrm{d}z
+    \right]  
+    \left[
+      \int 
+      \frac{1}{1+v/c} p(v|\textbf{x}) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
+      \; \mathrm{d}v
+    \right].
+\end{equation}
+$$
+
+This forward-model is used in most typical analyses of spectra from IFU datacubes. 
 
 ## Evaluating datacubes using FFTs
 
-_popkinmocks_ evaluates equation $\eqref{eq:fwdmod}$ to produce datacubes for a given choice of $p(t, v, \textbf{x}, z)$. While the integrals over age and metallicity are straightforward, the $v$ integral is more complicated. Rather than evaluate the $v$ integral directly, _popkinmocks_ uses the fact that \eqref{eq:fwdmod} can be transformed into a standard convolution by changing variables:
+_popkinmocks_ evaluates equation $\eqref{eq:fwdmod}$ to produce datacubes for a given choice of $p(t, v, \textbf{x}, z)$. While the integrals over $t$ and $z$ are straightforward, the $v$ integral is more complicated. Rather than evaluate this directly, _popkinmocks_ uses the fact that $\eqref{eq:fwdmod}$ can be re-written as a standard convolution by changing variables:
 
 * log wavelength, $\omega = \ln \lambda$
 * transformed velocity, $u = \ln(1 + v/c)$.
@@ -97,7 +120,7 @@ where $\tilde{p}$ and $\tilde{S}$ are re-labellings of $p$ and $S$ (see Section 
 
 ## Discretisation
 
-The discretisation in age and metallicity is set by the SSP models; there are various options when instantiating SSP models to modify the range and sampling of these parameters. Discretisation in the spatial dimensions $(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
+The discretisation in age and metallicity is set by the SSP models; there are various options when instantiating SSP models to modify the range and sampling of these parameters. Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
 
 ```{code-cell}
 cube = pkm.ifu_cube.IFUCube(
@@ -109,7 +132,7 @@ cube = pkm.ifu_cube.IFUCube(
 cube.get_distribution_shape('tvxz')
 ```
 
-This shape corresponds to the size of each variable in the string `tvxz` i.e. $(t, v, x_1, x_2, z)$. To get the values of, say, metallicity:
+This shape corresponds to the size of each variable in the string `tvxz` i.e. $(t, v, x_1, x_2, z)$. To see the values of metallicity, for example:
 
 ```{code-cell}
 cube.get_variable_values('z')
