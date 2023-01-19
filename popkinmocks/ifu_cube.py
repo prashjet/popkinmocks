@@ -186,6 +186,30 @@ class IFUCube(object):
             raise ValueError(f'Unknown variable: {which_variable}')
         return var
 
+    def get_variable_edges(self, which_variable):
+        """Get discretization bin edges of the variable v, x1, x2, t or z.
+
+        Args:
+            which_variable (string): which variable, one of v, x1, x2, t or z.
+
+        Returns:
+            array: the discretisation bin edges used for this variable
+
+        """
+        if which_variable == 't':
+            edg = self.ssps.par_edges[1]
+        elif which_variable == 'v':
+            edg = self.v_edg
+        elif which_variable == 'z':
+            edg = self.ssps.par_edges[0]
+        elif which_variable == 'x1':
+            edg = np.concatenate([self.x-self.dx/2, [self.x[-1]+self.dx/2]])
+        elif which_variable == 'x2':
+            edg = np.concatenate([self.y-self.dy/2, [self.y[-1]+self.dy/2]])
+        else:
+            raise ValueError(f'Unknown variable: {which_variable}')
+        return edg
+
     def get_variable_size(self, which_variable):
         """Get size of variable array
 
@@ -308,7 +332,7 @@ class IFUCube(object):
 
         Args:
             img (array): 2D image to show
-            ax: a `matplotlib` `axis` object
+            ax (`matplotlib` axis): optional, axis to plot on
             label_ax (bool): whether to show tick marks and labels
             colorbar (bool):  whether to show colorbar
             colorbar_label (string): colorbar label
@@ -351,12 +375,11 @@ class IFUCube(object):
             which_var (string): x-axis variable, one of ['t','v','x1','x2','z']
             arr (array): y-axis data to plot
             *args: any extra
-            label_ax (bool): whether to show tick marks and labels
-            colorbar (bool):  whether to show colorbar
-            colorbar_label (string): colorbar label
-            view (list): list of two strings amongst ['t','v','x1','x2','z']
-                representing the variables on the x- and y- axes of the image
-            **kw_imshow (dict): extra keyword parameters passed to `plt.imshow`
+            ax (`matplotlib` axis): optional, axis to plot on
+            xspacing (string): optional, `physical` (default) or `discrete`.
+                If `physical`, x-axis is spaced in physical units, otherwise
+                with equally spaced points per variable discretization
+            **kwargs (dict): extra keyword parameters passed to `plt.plot`
 
         Returns:
             a `matplotlib` `AxesImage` object
@@ -379,4 +402,35 @@ class IFUCube(object):
             ax.set_xticklabels(tick_labs)
         ax_lab = self.get_axis_label(which_var)
         ax.set_xlabel(ax_lab)
+        return ax
+
+    def plot_spectrum(self, arr, *args, ax=None, **kwargs):
+        """Wrapper around `plt.plot` to label axis
+
+        Args:
+            arr (array): y-axis data to plot
+            *args: any extra
+            ax (`matplotlib` axis): optional, axis to plot on
+            **kwargs (dict): extra keyword parameters passed to `plt.plot`
+
+        Returns:
+            a `matplotlib` `AxesImage` object
+
+        """
+        if ax is None:
+            ax = plt.gca()
+        arr = np.array(arr)
+        if arr.shape[0]==self.ssps.lmd.size:
+            wavelength = self.ssps.lmd
+        elif arr.shape[0]==self.ssps.w.size:
+            wavelength = np.exp(self.ssps.w)
+        else:
+            nlmd = self.ssps.lmd.size
+            nw = self.ssps.w.size
+            warning = 'arr incorrect shape: first dimension should have size '
+            warning += f'{nlmd} if sampled in wavelength or '
+            warning += f'{nw} if sampled in log wavelength.'
+            print(warning)
+        ax.plot(wavelength, arr, *args, **kwargs)
+        ax.set_xlabel('Wavelength [$\AA$]')
         return ax

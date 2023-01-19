@@ -1,1 +1,2 @@
-from popkinmocks import model_grids, ifu_cube, components
+from . import ifu_cube, components
+from .model_grids import milesSSPs
