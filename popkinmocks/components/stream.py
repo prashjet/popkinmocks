@@ -91,6 +91,7 @@ class Stream(parametric.ParametricComponent):
 
         """
         self.t_dep = t_dep * np.ones((self.cube.nx, self.cube.ny))
+        self.set_p_z_tx()
 
     def set_mu_v(self, mu_v_lims=[-100,100]):
         """Set mean velocity linearly varying with stream angle
