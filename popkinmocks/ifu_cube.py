@@ -261,7 +261,7 @@ class IFUCube(object):
         elif which_dist=='t':
             lab = '$t$ [Gyr]'
         elif which_dist=='z':
-            lab = '$z$ [Z/H]'
+            lab = '$z$ [M/H]'
         elif which_dist=='v':
             lab = '$v$ [km/s]'
         else:
@@ -320,6 +320,23 @@ class IFUCube(object):
             raise ValueError('Unknown `which_dist`')
         return ext
 
+    def get_image_extent(self, which_dist):
+        """
+        Args:
+            which_variable (string): which variable, one of v, x1, x2, t or z.
+
+        Returns:
+            string: th
+
+        """
+        if which_dist in ['x1', 'x2', 'v']:
+            ext = self.get_extent(which_dist)
+        elif which_dist in ['t', 'z']:
+            ext = (0,1)
+        else:
+            raise ValueError('Unknown `which_dist`')
+        return ext
+
     def imshow(self,
                img,
                ax=None,
@@ -348,8 +365,8 @@ class IFUCube(object):
         if ax is None:
             ax = plt.gca()
         img = np.flipud(img.T)
-        extent = self.get_extent(view[0])
-        extent += self.get_extent(view[1])
+        extent = self.get_image_extent(view[0])
+        extent += self.get_image_extent(view[1])
         img = ax.imshow(img, extent=extent, **kwargs)
         if colorbar:
             cbar = plt.colorbar(img)
