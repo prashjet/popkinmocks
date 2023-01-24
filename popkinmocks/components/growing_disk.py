@@ -106,6 +106,7 @@ class GrowingDisk(parametric.ParametricComponent):
                                t_dep_in=t_dep_in,
                                t_dep_out=t_dep_out)
         self.t_dep = t_dep
+        self.set_p_z_tx()
 
     def set_mu_v(self,
                  q_lims=(0.5, 0.5),

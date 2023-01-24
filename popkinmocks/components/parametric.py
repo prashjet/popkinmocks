@@ -255,11 +255,40 @@ class ParametricComponent(base.Component):
     def set_t_dep(self):
         """Set spatially varying depletion timescale
 
-        Should set an attribute `self.t_dep`, a 2D array of depletion time at 2D
-        position, of size [nx1, nx2]
+        Should set an attribute `self.t_dep`, a 2D array of depletion time vs 
+        2D position, of size [nx1, nx2] and end with `self.set_p_z_tx()`.
 
         """
         pass
+
+    def evaluate_chemical_enrichment_model(self, t_dep):
+        """Set p(z|t,x) given enrichment model and spatially varying t_dep
+
+        Evaluates the chemical evolution model defined in equations 3-10 of
+        Zhu et al 2020, parameterised by a spatially varying depletion
+        timescale created by `set_t_dep`.
+
+        """
+        del_t_dep = t_dep[:,:,np.newaxis] - self.z_t_interp_grid['t_dep']
+        abs_del_t_dep = np.abs(del_t_dep)
+        idx_t_dep = np.argmin(abs_del_t_dep, axis=-1)
+        z_mu = self.z_t_interp_grid['z'][np.ravel(idx_t_dep), :]
+        z_mu = np.reshape(z_mu, (self.cube.nx, self.cube.ny, -1))
+        z_mu = np.moveaxis(z_mu, -1, 0)
+        z_sig2 = self.ahat * z_mu**self.bhat
+        log_z_edg = self.cube.ssps.par_edges[0]
+        x_xsun = 1. # i.e. assuming galaxy has hydrogen mass fraction = solar
+        lin_z_edg = 10.**log_z_edg * x_xsun
+        nrm = stats.norm(loc=z_mu, scale=z_sig2**0.5)
+        lin_z_edg = lin_z_edg[:, np.newaxis, np.newaxis, np.newaxis]
+        log_cdf_z_tx = nrm.logcdf(lin_z_edg)
+        tmp = np.array([log_cdf_z_tx[1:], log_cdf_z_tx[:-1]])
+        tmp = special.logsumexp(tmp.T, -1, b=[1,-1]).T
+        log_dz = np.log(self.cube.construct_volume_element('z'))
+        log_norm = special.logsumexp(tmp.T + log_dz, -1).T
+        log_p_z_tx = tmp - log_norm
+        p_z_tx = np.exp(log_p_z_tx)
+        return log_p_z_tx, p_z_tx
 
     def set_p_z_tx(self):
         """Set p(z|t,x) given enrichment model and spatially varying t_dep
@@ -269,28 +298,27 @@ class ParametricComponent(base.Component):
         timescale created by `set_t_dep`.
 
         """
-        del_t_dep = self.t_dep[:,:,np.newaxis] - self.z_t_interp_grid['t_dep']
-        abs_del_t_dep = np.abs(del_t_dep)
-        idx_t_dep = np.argmin(abs_del_t_dep, axis=-1)
-        self.idx_t_dep = idx_t_dep
-        idx_t_dep = np.ravel(idx_t_dep)
-        z_mu = self.z_t_interp_grid['z'][idx_t_dep, :]
-        z_mu = np.reshape(z_mu, (self.cube.nx, self.cube.ny, -1))
-        z_mu = np.moveaxis(z_mu, -1, 0)
-        z_sig2 = self.ahat * z_mu**self.bhat
-        log_z_edg = self.cube.ssps.par_edges[0]
-        x_xsun = 1. # i.e. assuming galaxy has hydrogen mass fraction = solar
-        lin_z_edg = 10.**log_z_edg * x_xsun
-        nrm = stats.norm(loc=z_mu, scale=z_sig2**0.5)
-        lin_z_edg = lin_z_edg[:, np.newaxis, np.newaxis, np.newaxis]
-        # add the log quantity
-        log_cdf_z_tx = nrm.logcdf(lin_z_edg)
-        tmp = np.array([log_cdf_z_tx[1:], log_cdf_z_tx[:-1]])
-        tmp = special.logsumexp(tmp.T, -1, b=[1,-1]).T
-        log_dz = np.log(self.cube.construct_volume_element('z'))
-        log_norm = special.logsumexp(tmp.T + log_dz, -1).T
-        self.log_p_z_tx = tmp - log_norm
-        self.p_z_tx = np.exp(self.log_p_z_tx)
+        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model(
+            self.t_dep
+        )
+        self.log_p_z_tx = log_p_z_tx
+        self.p_z_tx = p_z_tx
+
+    def evaluate_chemical_enrichment_model_single_t_dep(self, t_dep):
+        """Set p(z|t,x) given enrichment model and spatially varying t_dep
+
+        Evaluates the chemical evolution model defined in equations 3-10 of
+        Zhu et al 2020, parameterised by a spatially varying depletion
+        timescale created by `set_t_dep`.
+
+        """
+        # pass array full of single provided t_dep
+        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model(
+            np.full((self.cube.nx, self.cube.ny), t_dep)
+        )
+        # take p_z_t from (x,y) = (0,0) since t_dep is constant  
+        p_z_t = p_z_tx[:,:,0,0]
+        return p_z_t
 
     def get_log_p_z_tx(self, density=True, light_weighted=False):
         """Get log p(z|t,x)
