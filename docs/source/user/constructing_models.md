@@ -207,7 +207,7 @@ which depends on three functions: core length $r_c(t)$, power-law slope $\alpha(
 ```{code-cell}
 disk.set_p_x_t(
   q_lims=(0.2, 0.8), # young disk flatter than old
-  rc_lims=(0.8, 0.2), # young disk larger core than old
+  rc_lims=(0.5, 0.2), # young disk larger core than old
   alpha_lims=(1.2, 0.8) # young disk steeper than old
   )
 ```
@@ -382,7 +382,7 @@ Our choice of $p(\textbf{x})$ is a curve in polar co-ordinates. This is paramete
 stream.set_p_x_t(
   theta_lims=(-np.pi/2., 3*np.pi/4.),
   mu_r_lims=(0.5, 1.),
-  sig=0.05
+  sig=0.15
   )
 
 p_x = stream.get_p('x')
@@ -420,7 +420,7 @@ These are weighted mixtures of other components. The weights must be non-negativ
 mixture = pkm.components.Mixture(
   cube=cube,
   component_list=[disk, stream],
-  weights=[0.8, 0.2]
+  weights=[0.9, 0.1]
   )
 mixture.evaluate_ybar()  
 ```

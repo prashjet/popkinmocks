@@ -1,5 +1,4 @@
 import numpy as np
-from scipy import stats, interpolate, optimize, special
 import matplotlib.pyplot as plt
 
 class IFUCube(object):
@@ -42,34 +41,6 @@ class IFUCube(object):
         self.ssps.logarithmically_resample(dv=dv)
         self.ssps.calculate_fourier_transform()
         self.ssps.get_light_weights()
-
-    def add_noise(self, snr=100.):
-        """Add noise with SNR which is constant with position and wavelength
-
-        yobs ~ Norm(ybar, ybar/snr)
-
-        Args:
-            snr : the desired signal-to-noise ratio
-
-        """
-        nrm = stats.norm(0.*self.ybar, self.ybar/snr)
-        self.snr = snr
-        self.noise = nrm.rvs()
-        self.yobs = self.ybar + self.noise
-
-    def add_sqrt_signal_noise(self, noise_constant=1.):
-        """Add noise which scales by sqrt of the signal
-
-        yobs ~ Norm(ybar, noise_constant*sqrt(ybar))
-
-        Args:
-            noise_constant : scaing constant for the noise
-
-        """
-        self.noise_constant = noise_constant
-        nrm = stats.norm(0, self.noise_constant*self.ybar**0.5)
-        self.noise = nrm.rvs()
-        self.yobs = self.ybar + self.noise
 
     def construct_volume_element(self, which_dist):
         """Construct volume element for converting densities to probabilties
