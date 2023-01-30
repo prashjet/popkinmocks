@@ -2,6 +2,8 @@ import numpy as np
 from scipy import interpolate, special
 import copy
 from functools import partial
+import os
+import dill
 
 class Component(object):
     """A galaxy component specified by the (log) joint density p(t,x,v,z)
@@ -788,3 +790,49 @@ class Component(object):
         if density:
             log_p_z -= np.log(self.cube.construct_volume_element('z'))
         return log_p_z
+
+    def dill_dump(self, fname, direc=None):
+        """Save the component as a dill dump
+
+        Args:
+            fname (string): filename
+            direc (string, optional): directory name
+
+        """
+        if os.path.isdir(direc) is False:
+            os.mkdir(direc)
+        with open(direc + fname, 'wb') as f:
+            dill.dump(self, f)
+            
+    def save_numpy(self, fname, yobs=None, direc=None):
+        """Save the component in `npz` format. Deprecated for `dill_dump`.
+
+        Saves various quantities about the cube and component in a `npz` file.
+        The density $p(t,v,x,z)$ is rearranged to $p(x,v,z,t)$ for backward
+        compatibility with v0.0. Prefer `self.dill_dump` where possible.
+
+        Args:
+            fname (string): filename
+            direc (string, optional): directory name
+            yobs (array, optional): the observed datacube, i.e. including noise
+
+        """
+        if os.path.isdir(direc) is False:
+            os.mkdir(direc)
+        v_edg = self.cube.v_edg
+        u_edg = np.log(1. + v_edg/self.ssps.speed_of_light)
+        p_tvxz = self.get_p('tvxz', collapse_cmps=True, density=True)
+        f_xvtz = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
+        np.savez(direc + fname,
+                 yobs=yobs,
+                 nx1=self.cube.nx,
+                 nx2=self.cube.ny,
+                 x1rng=self.cube.x1rng,
+                 x2rng=self.cube.x2rng,
+                 S=self.cube.ssps.Xw.reshape((-1,)+self.cube.ssps.par_dims),
+                 w=self.cube.ssps.w,
+                 z_bin_edges=self.cube.ssps.par_edges[0],
+                 t_bin_edges=self.cube.ssps.par_edges[1],
+                 ybar=self.ybar,
+                 v_edg=v_edg,
+                 f_xvtz=f_xvtz)

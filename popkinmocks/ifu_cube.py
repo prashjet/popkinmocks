@@ -1,8 +1,6 @@
 import numpy as np
 from scipy import stats, interpolate, optimize, special
 import matplotlib.pyplot as plt
-import os
-import dill
 
 class IFUCube(object):
     """The integral field unit (IFU) datacube
@@ -72,51 +70,6 @@ class IFUCube(object):
         nrm = stats.norm(0, self.noise_constant*self.ybar**0.5)
         self.noise = nrm.rvs()
         self.yobs = self.ybar + self.noise
-
-    def save_data(self,
-                  direc=None,
-                  fname=None):
-        """Save the IFUCube object as a dill dump
-
-        Args:
-            direc (string): directory name
-            fname (string): filename
-
-        """
-        if os.path.isdir(direc) is False:
-            os.mkdir(direc)
-        with open(direc + fname, 'wb') as f:
-            dill.dump(self, f)
-
-    def save_numpy(self,
-                   direc=None,
-                   fname=None):
-        """Save the IFUCube object as a numpy npz file
-
-        Args:
-            direc (string): directory name
-            fname (string): filename
-
-        """
-        if os.path.isdir(direc) is False:
-            os.mkdir(direc)
-        v_edg = self.v_edg
-        u_edg = np.log(1. + v_edg/self.ssps.speed_of_light)
-        p_tvxz = self.get_p('tvxz', collapse_cmps=True, density=True)
-        f_xvtz = np.moveaxis(p_tvxz, [0,1,2,3,4], [4,2,0,1,3])
-        np.savez(direc + fname,
-                 nx1=self.nx,
-                 nx2=self.ny,
-                 x1rng=self.x1rng,
-                 x2rng=self.x2rng,
-                 S=self.ssps.Xw.reshape((-1,)+self.ssps.par_dims),
-                 w=self.ssps.w,
-                 z_bin_edges=self.ssps.par_edges[0],
-                 t_bin_edges=self.ssps.par_edges[1],
-                 ybar=self.ybar,
-                 y=self.yobs,
-                 v_edg=v_edg,
-                 f_xvtz=f_xvtz)
 
     def construct_volume_element(self, which_dist):
         """Construct volume element for converting densities to probabilties
