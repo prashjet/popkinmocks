@@ -99,5 +99,16 @@ def test_datacube(my_galaxy, my_base_component):
     error = (galaxy.ybar - base_cmp.ybar)/galaxy.ybar
     assert np.median(np.abs(error)) < 0.0005 # i.e. 0.05% error
 
+def test_noise(my_galaxy):
+    """Check noise level of ShotNoise is > ConstantSNR for equal SNR
+    """
+    galaxy = my_galaxy
+    shot_noise = pkm.noise.ShotNoise(galaxy)
+    yobs_shot_noise = shot_noise.get_noisy_data(snr=100)
+    mad_shot_noise = np.median(np.abs(yobs_shot_noise))
+    constant_noise = pkm.noise.ConstantSNR(galaxy)
+    yobs_const_snr = constant_noise.get_noisy_data(snr=100)
+    mad_const_snr = np.median(np.abs(yobs_const_snr))
+    assert mad_shot_noise > mad_const_snr
 
 # end
