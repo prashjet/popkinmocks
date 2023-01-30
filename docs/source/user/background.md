@@ -56,8 +56,6 @@ $$
 
 which says that velocities and stellar populations only interact via their dependence on position.
 
-The four variables $(t, v, \mathbf{x}, z)$ form incomplete description of the stellar population and kinematics of galaxies. Several quantities are missing: two components of velocity, one position, and several chemical tags which go beyond a single metallicity (e.g. alpha abundances, or individual elemental abundances). However, for the vast majority of galaxies in the Universe, the data we can measure limits us to considering only $(t, v, \mathbf{x}, z)$.
-
 ## IFU datacubes
 
 Integral Field Units (IFUs) are a type of instrument which can observe spatial and spectral information simultaneously. IFU observations result in datacubes $y(\textbf{x}, \lambda)$ which describe the flux observed at a position $\textbf{x}$ and wavelength $\lambda$. The datacube is connected to the stellar population-kinematic distribution via the equation:
@@ -100,7 +98,7 @@ This forward-model is used in most typical analyses of spectra from IFU datacube
 
 ## Evaluating datacubes using FFTs
 
-_popkinmocks_ evaluates equation $\eqref{eq:fwdmod}$ to produce datacubes for a given choice of $p(t, v, \textbf{x}, z)$. While the integrals over $t$ and $z$ are straightforward, the $v$ integral is more complicated. Rather than evaluate this directly, _popkinmocks_ uses the fact that $\eqref{eq:fwdmod}$ can be re-written as a standard convolution by changing variables:
+_popkinmocks_ evaluates equation $\eqref{eq:fwdmod}$ to produce datacubes for a given choice of $p(t, v, \textbf{x}, z)$. To help perform the integral over $v$, _popkinmocks_ uses the fact that $\eqref{eq:fwdmod}$ can be re-written as a standard convolution by changing variables:
 
 * log wavelength, $\omega = \ln \lambda$
 * transformed velocity, $u = \ln(1 + v/c)$.
@@ -109,14 +107,14 @@ This transforms $\eqref{eq:fwdmod}$ into a standard convolution over $u$:
 
 $$
 \begin{equation}
-  y(\textbf{x}, \omega) = \int \int \int 
+  \tilde{y}(\textbf{x}, \omega) = \int \int \int 
     \tilde{p}(t, u, \textbf{x}, z) \tilde{S}\left(\omega - u; t, z\right) 
     \; \mathrm{d}t \; \mathrm{d}u \; \mathrm{d}z
   \label{eq:fwdmod_transformed}
 \end{equation}
 $$
 
-where $\tilde{p}$ and $\tilde{S}$ are re-labellings of $p$ and $S$ (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT) algorithm, producing a datacube sampled in log wavelength $\omega$ rather than wavelength $\lambda$.
+where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are trivial re-labellings (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT), producing a datacube sampled in log wavelength $\omega$ rather than wavelength $\lambda$.
 
 ## Discretisation
 

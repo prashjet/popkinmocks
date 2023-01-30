@@ -20,7 +20,8 @@ _popkinmocks_ offers several options to construct models:
 * from simulation particles (`FromParticle`),
 * using a library of parameterised components (`ParametricComponent`),
 * as a mixture of other components (`Mixture`),
-* from a pixel representation of $p(t, v, \textbf{x}, z)$ (using the base `Component` class).
+* from a pixel representation of $p(t, v, \textbf{x}, z)$ (using the base `Component` class),
+* from a file (using `dill`),
 
 These options are related via the following inheritance diagram:
 
@@ -263,7 +264,7 @@ print(p_z_tx.shape) # = (nz, nt, nx1, nx2)
 
 Lastly, set the kinematics via the functions $\mu_v(\textbf{x},t)$ and $\sigma_v(\textbf{x},t)$.
 
-The function $\mu_v(\textbf{x},t)$ resembles a rotating disk. Along the major-axis, this is encoded as a peaked rotation curve. Off of the major-axis, the velocity field follows elliptical equivelocity contours. Altogether, this parameterisation requires three (age-dependent) parameters: flattening $q(t)$, peak velocity $v_\mathrm{max}(t)$, and the radius at which rotation curve reaches the peak $r_\mathrm{max}(t)$. The specific function used is,
+The function $\mu_v(\textbf{x},t)$ resembles the velocity field of a rotating disk. Along the major-axis, the velocity is given by a rotation curve which peaks at some given radius. Off of the major-axis, we turn the 1D rotation curve to a 2D velocity field by multiplying by the cosine of the (flattened) polar co-ordinate $\theta_q(\textbf{x},t)$. Altogether, this parameterisation requires three (age-dependent) parameters: flattening $q(t)$, peak velocity $v_\mathrm{max}(t)$, and the radius at which rotation curve reaches the peak $r_\mathrm{max}(t)$. The specific function used is,
 
 $$
 \mu_v(\textbf{x},t) =
@@ -341,7 +342,7 @@ stream = pkm.components.Stream(cube=cube)
 stream.set_p_t(lmd=4., phi=0.9)
 ```
 
-Tidal stripping may disrupt spatial structures formed through in-situ star formation. For example age gradients in a satellite may be mixed away as a stream is formed. This motivates several simplifying assumptions for our stream component:
+Tidal stripping may disrupt spatial structures formed through in-situ star formation. For example age gradients in a satellite galaxy may be mixed away as a stream is formed. This motivates several simplifying assumptions for our stream component:
 
 1. we use a constant depletion timescale, i.e.
 
@@ -375,7 +376,7 @@ $$
 \mu_v(\textbf{x},t) = \mu_v(\textbf{x}).
 $$
 
-Our specific choice of $p(\textbf{x})$ is a curve in polar co-ordinates. This is parameterised with start/end polar angles `theta_lims`, radii `mu_r_lims`, and a spatial thickness perpendicular to the stream `sig`. Radius increases linearly between the given angles. The density along the stream is constant with polar angle. 
+Our choice of $p(\textbf{x})$ is a curve in polar co-ordinates. This is parameterised with start/end polar angles `theta_lims`, radii `mu_r_lims`, and a spatial thickness `sig` perpendicular to the stream track. Stream radius increases linearly between the given angles. Density along the stream remains constant with polar angle.
 
 ```{code-cell}
 stream.set_p_x_t(
@@ -438,9 +439,9 @@ shows the stream clearly superimposed across the disk.
 
 ## Pixel representation of $p(t, v, \textbf{x}, z)$
 
-The last option to create a model is directly from a pixelated representation of $p(t, v, \textbf{x}, z)$. For numerical accuracy, we will actually use the log density $\log p(t, v, \textbf{x}, z)$ instead of the density itself. To create a component this way, use the base `Component` class.
+Another option to create a model is to directly from a pixelated representation of $p(t, v, \textbf{x}, z)$. This can be done with the base `Component` class. For better numerical precision, we actually use the log density $\log p(t, v, \textbf{x}, z)$ instead of the density itself.
 
-How might you come across a pixelated representation of $\log p(t, v, \textbf{x}, z)$? One option is to create a histogram of simulation particles, then take its logarithm. This is exactly what is implemented in the `FromParticle` class.
+But how might you come across a pixelated representation of $\log p(t, v, \textbf{x}, z)$? One option is to create a histogram of simulation particles, then take its logarithm. This is exactly what is implemented in the `FromParticle` class.
 
 Another way you could access a $\log p(t, v, \textbf{x}, z)$ is by using another _popkinmocks_ component. For example we can create a *pixelated* version of the mixture model,
 
@@ -468,4 +469,4 @@ median_abs_err = np.median(np.abs(error_pc))
 print(f'Median abolsute error = {median_abs_err:.2f} %')
 ```
 
-we see are significant differences. Increasing the velocity resolution of the cube (`nv`) should reduce these errors. Checks such as these form of the automated testing routines in _popkinmocks_.
+we see are significant differences. Increasing the velocity resolution of the cube (`nv`) should reduce these errors. Checks such as these form the basis of the automated testing routines in _popkinmocks_.

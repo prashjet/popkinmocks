@@ -23,7 +23,6 @@ User Guide
    user/constructing_models.md
    user/derived_properties.md
    user/datacube_noise.md
-   user/saving_and_loading.md
    user/visualisation.md
 
 Indices and tables
