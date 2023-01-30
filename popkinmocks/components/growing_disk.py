@@ -74,7 +74,9 @@ class GrowingDisk(parametric.ParametricComponent):
                   q=0.1,
                   alpha=1.5,
                   t_dep_in=0.5,
-                  t_dep_out=6.):
+                  t_dep_out=6.,
+                  t_dep_min=0.1,
+                  t_dep_max=13.):
         """Set spatially-varying depletion timescale
 
         t_dep varies as power law in eliptical radius with axis ratio q with
@@ -83,24 +85,31 @@ class GrowingDisk(parametric.ParametricComponent):
 
         Args:
             q : y/x axis ratio of ellipses of `t_dep` equicontours
-            alpha : power law slope for varying `t_dep`
+            alpha : exponent >0 for varying `t_dep`
             t_dep_in : central value of `t_dep`
             t_dep_out : outer value of `t_dep`
+            t_dep_min : min value of `t_dep`, default 0.1 Gyr
+            t_dep_max : max value of `t_dep`, default 13. Gyr     
 
         """
         # check input
         assert q > 0.
-        assert alpha >= 1.
-        assert (t_dep_in > 0.1) and (t_dep_in < 10.0)
-        assert (t_dep_out > 0.1) and (t_dep_out < 10.0)
+        assert alpha >= 0.
+        assert t_dep_min >= 0.1
+        assert t_dep_max <= 13.
+        assert (t_dep_in >= t_dep_min) and (t_dep_in <= t_dep_max)
+        assert (t_dep_out >= t_dep_min) and (t_dep_out <= t_dep_max)
         # evaluate t_dep maps
         rr2 = self.xxp**2 + (self.yyp/q)**2
         rr = rr2**0.5
-        log_t_dep_in = np.log(t_dep_in)
-        log_t_dep_out = np.log(t_dep_out)
-        delta_log_t_dep = log_t_dep_in - log_t_dep_out
-        log_t_dep = log_t_dep_out + delta_log_t_dep * alpha**-rr
-        t_dep = np.exp(log_t_dep)
+        delta_t_dep = t_dep_out - t_dep_in
+        max_abs_x1 = np.max(np.abs(self.xxp))
+        t_dep = t_dep_in + delta_t_dep*(rr/max_abs_x1)**alpha
+        if t_dep_in <= t_dep_out:
+            idx = np.where(t_dep > t_dep_out)
+        else:
+            idx = np.where(t_dep < t_dep_out)
+        t_dep[idx] = t_dep_out
         self.t_dep_pars = dict(q=q,
                                alpha=alpha,
                                t_dep_in=t_dep_in,
@@ -164,7 +173,10 @@ class GrowingDisk(parametric.ParametricComponent):
                   q_lims=(0.5, 0.1),
                   alpha_lims=(1.5, 2.5),
                   sig_v_in_lims=(50., 250.),
-                  sig_v_out_lims=(10., 50)):
+                  sig_v_out_lims=(10., 50),
+                  sigma_max = 500.,
+                  sigma_min = 10.
+                  ):
         """Set age-and-space dependent velocity dispersion maps
 
         Dispersion maps vary as power-laws between central value sig_v_in, outer
@@ -184,7 +196,7 @@ class GrowingDisk(parametric.ParametricComponent):
         q_lims = np.array(q_lims)
         assert np.all(q_lims > 0.)
         alpha_lims = np.array(alpha_lims)
-        assert np.all(alpha_lims >= 1.)
+        assert np.all(alpha_lims >= 0.)
         sig_v_in_lims = np.array(sig_v_in_lims)
         assert np.all(sig_v_in_lims > 0.)
         sig_v_out_lims = np.array(sig_v_out_lims)
@@ -201,13 +213,25 @@ class GrowingDisk(parametric.ParametricComponent):
         # evaluate sig_v maps
         rr2 = self.xxp**2 + (self.yyp/q)**2
         rr = rr2**0.5
-        log_sig_v_in = np.log(sig_v_in)
-        log_sig_v_out = np.log(sig_v_out)
-        delta_log_sig_v = log_sig_v_in - log_sig_v_out
-        log_sig = log_sig_v_out + delta_log_sig_v * alpha**-rr
-        sig = np.exp(log_sig)
+
+        # log_sig_v_in = np.log(sig_v_in)
+        # log_sig_v_out = np.log(sig_v_out)
+        # delta_log_sig_v = log_sig_v_in - log_sig_v_out
+        # log_sig = log_sig_v_out + delta_log_sig_v * alpha**-rr
+        # sig = np.exp(log_sig)
+
+        delta_sigma = sig_v_out - sig_v_in
+        max_abs_x1 = np.max(np.abs(self.xxp))
+        sigma = sig_v_in + delta_sigma*(rr/max_abs_x1)**alpha
+        nt = self.cube.get_variable_size('t')
+        for i in range(nt):
+            if sig_v_out[i,0,0] > sig_v_in[i,0,0]:
+                idx = np.where(sigma[i] > sig_v_out[i])
+            else:
+                idx = np.where(sigma[i] < sig_v_out[i])
+            sigma[i][idx] = sig_v_out[i]
         self.sig_v_pars = dict(q_lims=q_lims,
                                alpha_lims=alpha_lims,
                                sig_v_in_lims=sig_v_in_lims,
                                sig_v_out_lims=sig_v_out_lims)
-        self.sig_v = sig
+        self.sig_v = sigma

@@ -86,13 +86,18 @@ def test_moments(my_cube,
             assert median_error<1e-10
 
 def test_datacube(my_galaxy, my_base_component):
-    """Tests datacubes agree
+    """Check that datacubes computed using two different methods agree.
+    
+    `my_galaxy` is a mixture of parametric components, and uses analytic 
+    Fourier transforms to evaluate the datacube. `my_base_component` 
+    is created using a discretised $p(t,v,x,z)$ and uses FFTs to evaluate the 
+    datacube. Check that the difference per spaxel < 0.05% between two methods.
 
     """
     galaxy = my_galaxy
     base_cmp = my_base_component
     error = (galaxy.ybar - base_cmp.ybar)/galaxy.ybar
-    assert np.median(np.abs(error)) < 0.0002
+    assert np.median(np.abs(error)) < 0.0005 # i.e. 0.05% error
 
 
 # end

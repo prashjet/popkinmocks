@@ -31,7 +31,21 @@ release = '1.0.0'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.inheritance_diagram",
+    'sphinx.ext.graphviz',
+    "myst_nb",
+    "IPython.sphinxext.ipython_console_highlighting",
 ]
+
+myst_enable_extensions = ["dollarmath", "colon_fence"]
+
+mathjax3_config = {
+    'TeX': {'equationNumbers': {'autoNumber': 'AMS', 'useLabelIds': True}},
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
