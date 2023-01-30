@@ -261,7 +261,7 @@ class ParametricComponent(base.Component):
         """
         pass
 
-    def evaluate_chemical_enrichment_model(self, t_dep):
+    def evaluate_chemical_enrichment_model_base(self, t_dep):
         """Set p(z|t,x) given enrichment model and spatially varying t_dep
 
         Evaluates the chemical evolution model defined in equations 3-10 of
@@ -298,13 +298,13 @@ class ParametricComponent(base.Component):
         timescale created by `set_t_dep`.
 
         """
-        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model(
+        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model_base(
             self.t_dep
         )
         self.log_p_z_tx = log_p_z_tx
         self.p_z_tx = p_z_tx
 
-    def evaluate_chemical_enrichment_model_single_t_dep(self, t_dep):
+    def evaluate_chemical_enrichment_model(self, t_dep):
         """Set p(z|t,x) given enrichment model and spatially varying t_dep
 
         Evaluates the chemical evolution model defined in equations 3-10 of
@@ -313,7 +313,7 @@ class ParametricComponent(base.Component):
 
         """
         # pass array full of single provided t_dep
-        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model(
+        log_p_z_tx, p_z_tx = self.evaluate_chemical_enrichment_model_base(
             np.full((self.cube.nx, self.cube.ny), t_dep)
         )
         # take p_z_t from (x,y) = (0,0) since t_dep is constant  

@@ -37,7 +37,7 @@ class Mixture(base.Component):
 
     def get_p(self,
               which_dist,
-              collapse_cmps=False,
+              collapse_cmps=True,
               density=True,
               light_weighted=False):
         """Evaluate probability functions
@@ -81,7 +81,7 @@ class Mixture(base.Component):
 
     def get_log_p(self,
                   which_dist,
-                  collapse_cmps=False,
+                  collapse_cmps=True,
                   density=True,
                   light_weighted=False):
         """Evaluate log probability functions

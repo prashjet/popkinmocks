@@ -10,7 +10,6 @@ Welcome to popkinmocks's documentation!
 
 Models are specified as distributions over stellar population and kinematic parameters, which can be created either (i) using a provided library of galactic component with parameterised forms of their morphologies, kinematics, star formation histories, and chemical enrichments, or (ii) using particle-data from simulations. Once you specify a model distribution, `popkinmocks` provides tools to evaluate the stellar integrated-light contribution to the IFU datacube, and derived properties of the distribution such as (mass or light weighted) marginal and conditional distributions, and moments.
 
-
 User Guide
 ==================
 

@@ -38,6 +38,7 @@ class IFUCube(object):
         xx, yy = np.meshgrid(self.x, self.y, indexing='ij')
         self.xx = xx
         self.yy = yy
+        self.nv = nv
         self.v_edg = np.linspace(*vrng, nv+1)
         dv = self.v_edg[1] - self.v_edg[0]
         self.ssps.logarithmically_resample(dv=dv)
