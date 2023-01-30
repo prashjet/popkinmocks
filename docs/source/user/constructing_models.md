@@ -21,9 +21,9 @@ _popkinmocks_ offers several options to construct models:
 * using a library of parameterised components (`ParametricComponent`),
 * as a mixture of other components (`Mixture`),
 * from a pixel representation of $p(t, v, \textbf{x}, z)$ (using the base `Component` class),
-* from a file (using `dill`),
+* save and load existing models from file (using `dill`).
 
-These options are related via the following inheritance diagram:
+The first four options are related via the following inheritance diagram:
 
 ```{eval-rst}
 .. inheritance-diagram:: popkinmocks.components.particle.FromParticle popkinmocks.components.stream.Stream  popkinmocks.components.growing_disk.GrowingDisk popkinmocks.components.mixture.Mixture
@@ -470,3 +470,20 @@ print(f'Median abolsute error = {median_abs_err:.2f} %')
 ```
 
 we see are significant differences. Increasing the velocity resolution of the cube (`nv`) should reduce these errors. Checks such as these form the basis of the automated testing routines in _popkinmocks_.
+
+## From file using `dill`
+
+We use the [`dill`](https://dill.readthedocs.io/en/latest/) package to save and load files. Components have a convenicence method `dill_dump` to save into a `.dill` file. For example, to save the `mixture` component we made previously,
+
+```{code-cell}
+mixture.dill_dump(fname='my_mixture_component.dill', direc='data/')
+```
+
+This can then be reloaded in a later session,
+
+```{code-cell}
+import dill
+with open('data/my_mixture_component.dill', 'rb') as file:
+    mixture_reloaded = dill.load(file)
+print(mixture_reloaded)
+```
