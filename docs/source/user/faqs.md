@@ -72,4 +72,34 @@ cube.plot_spectrum(mask, label='mask')
 _ = plt.gca().legend()
 ```
 
-## Another question...?
+(faq_spec_modelling)=
+## How is this connected to spectral modelling?
+
+In _popkinmocks_, by describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$ we can capture all relations between these four variables without imposing simplifying assumptions. One such assumption which is commonly used when modelling observed spectra is that at a fixed position, velocities and stellar populations are independent. This statement is equivalent to the factorisation:
+
+$$
+p(t, v, \textbf{x}, z) = p(\textbf{x}) p(v|\textbf{x}) p(t,z|\textbf{x})
+\tag{1}
+\label{eq:factor_p}
+$$
+
+which says that velocities and stellar populations only interact via their dependence on position.
+
+What happens if we insert the simplifying assumption shown in $\eqref{eq:factor_p}$ into the integral equation for the datacube i.e. equation (1) on the [background](background.md) page? In this case, the integral can be factored as follows
+
+$$
+\begin{equation}
+  y(\textbf{x}, \lambda) = 
+    p(\textbf{x})
+    \left[
+      \int \int p(t,z|\textbf{x}) \; \mathrm{d}t \; \mathrm{d}z
+    \right]  
+    \left[
+      \int 
+      \frac{1}{1+v/c} p(v|\textbf{x}) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
+      \; \mathrm{d}v
+    \right].
+\end{equation}
+$$
+
+This is the forward-model is used in most typical analyses of binned spectra from IFU datacubes i.e. a binned spectrum extracted at a position $\textbf{x}$ and modelled as a superposition of SSPs weighted by $p(t,z|\textbf{x})$ and convolved with a single LOSVD $p(v|\textbf{x})$.

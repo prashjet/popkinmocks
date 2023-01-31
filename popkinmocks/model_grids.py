@@ -264,8 +264,32 @@ class milesSSPs(modelGrid):
         return x_edg
 
     def set_tick_positions(self,
-                           t_ticks=[0, 1, 5, 13],
-                           z_ticks=[-2, -1, 0]):
+                           t_ticks=None,
+                           z_ticks=None):
+        if t_ticks is None and hasattr(self, 't_ticks') is False:
+            t_ticks = [0.1, 1, 5, 13]
+        elif t_ticks is None:
+            t_ticks = self.t_ticks
+        else:
+            pass
+        if z_ticks is None and hasattr(self, 'z_ticks') is False:
+            z_ticks = [-2, -1, 0]
+        elif z_ticks is None:
+            z_ticks = self.z_ticks
+        else:
+            pass
+        # remove ticks which are out of bounds
+        t_ticks = np.array(t_ticks)
+        t_lims = self.par_edges[1]
+        t_lo, t_hi = t_lims[0], t_lims[-1]
+        idx = np.where((t_ticks>t_lo) & (t_ticks<t_hi))
+        t_ticks = t_ticks[idx]
+        z_ticks = np.array(z_ticks)
+        z_lims = self.par_edges[0]
+        z_lo, z_hi = z_lims[0], z_lims[-1]
+        idx = np.where((z_ticks>z_lo) & (z_ticks<z_hi))
+        z_ticks = z_ticks[idx]
+        # go on with your day in peace
         self.t_ticks = t_ticks
         self.z_ticks = z_ticks
         tmp = np.linspace(0, 1, self.par_dims[1]+1)
@@ -318,6 +342,19 @@ class milesSSPs(modelGrid):
         light_weights = light_weights.T
         self.light_weights = light_weights
 
+    def get_ssp_wavelength_spacing(self, ssp_id):
+        id_z, id_t = self.par_idx[:,ssp_id]
+        z = self.par_cents[0][id_z]
+        t = self.par_cents[1][id_t]
+        spectrum = self.X[:,ssp_id]
+        return t, z, spectrum
+
+    def get_ssp_log_wavelength_spacing(self, ssp_id):
+        id_z, id_t = self.par_idx[:,ssp_id]
+        z = self.par_cents[0][id_z]
+        t = self.par_cents[1][id_t]
+        spectrum = self.Xw[:,ssp_id]
+        return t, z, spectrum
 
 
 # end
