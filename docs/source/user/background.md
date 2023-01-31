@@ -11,9 +11,9 @@ kernelspec:
   name: python3
 ---
 
-# Background
+# IFUs for Galaxy Stellar Light
 
-Some basic background.
+This introduction provides some background about stellar populations, kinematics and the forward model to evaluate the integrated-light stellar contribution to IFU datacubes.
 
 ## Stellar populations and kinematics
 
@@ -32,29 +32,16 @@ import matplotlib.pyplot as plt
 
 ssps = pkm.model_grids.milesSSPs()
 
-# get t, z and spectrum for a given ssp index
-ssp_id = 40
-id_z, id_t = ssps.par_idx[:,ssp_id]
-z = ssps.par_cents[0][id_z]
-t = ssps.par_cents[1][id_t]
-spectrum = ssps.X[:,ssp_id]
-
-# plot it
+# plot ssp for a given model index
+index = 40
+t, z, spectrum = ssps.get_ssp_wavelength_spacing(index)
 _ = plt.plot(ssps.lmd, spectrum)
 _ = plt.gca().set_title(f'SSP with age {t} Gyr & metallicity {z} [M/H]')
 _ = plt.gca().set_xlabel('Wavelength [Ang.]')
 _ = plt.gca().set_ylabel('Flux')
 ```
 
-Stellar kinematics refer to the velocities and positions of stars within a galaxy. By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$, we can capture all relations between these four variables without imposing simplifying assumptions. One such assumption which is commonly used when modelling observed spectra is that at a fixed position, velocities and stellar populations are independent. This statement is equivalent to the factorisation:
-
-$$
-p(t, v, \textbf{x}, z) = p(\textbf{x}) p(v|\textbf{x}) p(t,z|\textbf{x})
-\tag{1}
-\label{eq:factor_p}
-$$
-
-which says that velocities and stellar populations only interact via their dependence on position.
+Stellar kinematics refer to the velocities and positions of stars within a galaxy. By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$, we can capture all relations between these four variables.
 
 ## IFU datacubes
 
@@ -65,7 +52,7 @@ $$
   y(\textbf{x}, \lambda) = \int \int \int 
     \frac{1}{1+v/c} p(t, v, \textbf{x}, z) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
     \; \mathrm{d}t \; \mathrm{d}v \; \mathrm{d}z
-  \tag{2}
+  \tag{1}
   \label{eq:fwdmod}
 \end{equation}
 $$
@@ -75,26 +62,7 @@ where we have introduced notation for the:
 * spectrum of SSP with age $t$ and metallicity $z$, $S(\lambda ; t, z)$, and
 * speed of light, $c$.
 
-The two factors of $(1+v/c)$ in this equation arise from Doppler-shifting of light: the factor inside $S$ translates from the rest-frame to observed wavelengths given a LOS velocity $v$, while the pre-factor scales the flux, ensuring total luminosity is conserved.
-
-What happens if we insert the simplifying assumption shown in $\eqref{eq:factor_p}$ into equation $\eqref{eq:fwdmod}$? In this case, the integral can be factored as follows
-
-$$
-\begin{equation}
-  y(\textbf{x}, \lambda) = 
-    p(\textbf{x})
-    \left[
-      \int \int p(t,z|\textbf{x}) \; \mathrm{d}t \; \mathrm{d}z
-    \right]  
-    \left[
-      \int 
-      \frac{1}{1+v/c} p(v|\textbf{x}) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
-      \; \mathrm{d}v
-    \right].
-\end{equation}
-$$
-
-This forward-model is used in most typical analyses of spectra from IFU datacubes. 
+The two factors of $(1+v/c)$ in this equation arise from Doppler-shifting of light: the factor inside $S$ translates from the rest-frame to observed wavelengths given a LOS velocity $v$, while the pre-factor scales the flux, ensuring total luminosity is conserved. To see how equation $\eqref{eq:fwdmod}$ connects to the standard equation for spectral modelling [see here](faq_spec_modelling).
 
 ## Evaluating datacubes using FFTs
 
