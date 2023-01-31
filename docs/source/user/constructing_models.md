@@ -99,18 +99,7 @@ integrated_spectrum = np.sum(simulation.ybar, (1,2))
 _ = cube.plot_spectrum(integrated_spectrum)
 ```
 
-Note the large spikes at the start and end of this spectrum. These are not spectral lines; instead they are unphysical artifacts which arise due the fact that we use Fourier transforms to perform convolutions. This results in the endpoints of the spectrum _wrapping around_. As artifacts, these spikes should be masked for any subsequent analyses.
-
-To construct a mask we must know how wide we should expect the spikes to be. A broader LOSVD will result in more _wrapping around_ and wider spikes. To construct a mask, you should pick some maximum absolute velocity that you are confident contains all the LOSVD, then converting this into a pixel mask as follows:
-
-```{code-cell}
-max_velocity = 800.
-n_spax_mask = int(max_velocity/cube.ssps.dv)
-
-mask = np.zeros_like(integrated_spectrum, dtype=int)
-mask[:n_spax_mask] = 1
-mask[-n_spax_mask:] = 1
-```
+The large spikes at the start and end of this spectrum are unphysical artifacts - see [FAQs](faqs.md) for more info.
 
 ## Parameterised components
 

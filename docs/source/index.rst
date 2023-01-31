@@ -24,6 +24,7 @@ User Guide
    user/derived_properties.md
    user/datacube_noise.md
    user/visualisation.md
+   user/faqs.md
 
 Indices and tables
 ==================
