@@ -2,14 +2,15 @@ name: CodeCov
 on: [pull_request]
 jobs:
   run:
-    runs-on: ubuntu-latest
-    env:
-      OS: ubuntu-latest
-      PYTHON: '3.10'
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.7", "3.11"]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-    - name: Setup Python
+    - name: Setup Python ${{ matrix.python-version }} for ${{ matrix.os }}
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
