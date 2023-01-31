@@ -3,7 +3,9 @@
 Installation
 ============
 
-.. note:: ``popkinmocks`` requires Python CHECK WHICH VERSION and later.
+.. note:: ``popkinmocks`` requires Python 3.7 and later.
+
+This package is tested on Python versions 3.7 and 3.11 on Ubuntu and MacOS systems.
 
 From Source
 -----------
