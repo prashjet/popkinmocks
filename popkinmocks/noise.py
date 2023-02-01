@@ -4,9 +4,8 @@ from scipy import stats
 
 
 class Noise(object):
-
     def __init__(self, component):
-        """Noise 
+        """Noise
 
         Args:
             component : a `popkinmocks` component with pre-evaluated `ybar`
@@ -15,20 +14,18 @@ class Noise(object):
         self.component = component
 
     def get_noisy_data(self, **kwargs):
-        """yobs(x,w) = ybar(x,w) + eps(x,w)
-        """
+        """yobs(x,w) = ybar(x,w) + eps(x,w)"""
         ybar = self.component.ybar
         eps = self.sample(**kwargs)
         yobs = ybar + eps
         return yobs
-    
+
     @abstractmethod
     def sample(self):
         pass
 
 
 class Diagonal(Noise):
-
     def sample(self, **kwargs):
         """eps(x,w) ~ Norm(0 , sigma(x,w))
 
@@ -47,19 +44,18 @@ class Diagonal(Noise):
 
 
 class ConstantSNR(Diagonal):
-
-    def get_sigma(self, snr=100.):
+    def get_sigma(self, snr=100.0):
         """sigma(x,w) = ybar(x,w)/snr
 
         Args:
             snr : the desired constant signal-to-noise ratio
 
         """
-        return self.component.ybar/snr
+        return self.component.ybar / snr
+
 
 class ShotNoise(Diagonal):
-
-    def get_sigma(self, snr=100.):
+    def get_sigma(self, snr=100.0):
         """sigma(x,w) =  K ybar(x,w)^(1/2)
 
         Proportionality constant K chosen so that brightest pixel has desired
@@ -70,6 +66,6 @@ class ShotNoise(Diagonal):
 
         """
         max_ybar = np.max(self.component.ybar)
-        K = max_ybar**0.5/snr
+        K = max_ybar**0.5 / snr
         sigma = K * self.component.ybar**0.5
         return sigma
