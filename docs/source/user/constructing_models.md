@@ -48,7 +48,7 @@ import popkinmocks as pkm
 
 ssps = pkm.milesSSPs(thin_age=6, thin_z=2)
 cube = pkm.ifu_cube.IFUCube(
-  ssps=ssps, nx1=21, nx2=21, nv=21, vrng=(-1000,1000)
+  ssps=ssps, nx1=21, nx2=21, nv=25, vrng=(-1000,1000)
   )
 ```
 
