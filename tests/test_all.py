@@ -106,10 +106,12 @@ def test_noise(my_galaxy):
     galaxy = my_galaxy
     shot_noise = pkm.noise.ShotNoise(galaxy)
     yobs_shot_noise = shot_noise.get_noisy_data(snr=100)
-    mad_shot_noise = np.median(np.abs(yobs_shot_noise))
+    eps_shot_noise = yobs_shot_noise-galaxy.ybar
+    mad_shot_noise = np.median(np.abs(eps_shot_noise))
     constant_noise = pkm.noise.ConstantSNR(galaxy)
     yobs_const_snr = constant_noise.get_noisy_data(snr=100)
-    mad_const_snr = np.median(np.abs(yobs_const_snr))
+    eps_const_snr = yobs_const_snr-galaxy.ybar
+    mad_const_snr = np.median(np.abs(eps_const_snr))
     assert mad_shot_noise > mad_const_snr
 
 # end

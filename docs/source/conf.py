@@ -17,13 +17,20 @@
 
 # -- Project information -----------------------------------------------------
 
+from pkg_resources import DistributionNotFound, get_distribution
+
+try:
+    __version__ = get_distribution("popkinmocks").version
+except DistributionNotFound:
+    __version__ = "unknown version"
+
 project = 'popkinmocks'
 copyright = '2023, Prashin Jethwa'
 author = 'Prashin Jethwa'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
-
+version = __version__
+release = __version__
 
 # -- General configuration ---------------------------------------------------
 
@@ -68,6 +75,6 @@ html_theme = "sphinx_book_theme"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_title = "popkinmocks"
+html_title = f"popkinmocks v{version}"
 html_logo = "_static/popkinmocks_logo.png"
 html_favicon = "_static/popkinmocks_logo.png"
