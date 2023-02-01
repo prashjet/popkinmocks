@@ -34,7 +34,7 @@ ssps = pkm.model_grids.milesSSPs()
 
 # plot ssp for a given model index
 index = 40
-t, z, spectrum = ssps.get_ssp_wavelength_spacing(index)
+t, z, spectrum = ssps.get_ssp(index)
 _ = plt.plot(ssps.lmd, spectrum)
 _ = plt.gca().set_title(f'SSP with age {t} Gyr & metallicity {z} [M/H]')
 _ = plt.gca().set_xlabel('Wavelength [Ang.]')

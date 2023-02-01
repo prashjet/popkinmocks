@@ -13,9 +13,7 @@ class modelGrid:
                  npars,
                  par_dims,
                  par_lims,
-                 par_mask_function,
-                 normalise_models=False,    # False / column / volume
-                 X=None):
+                 X):
         self.n = n
         self.lmd_min = lmd_min
         self.lmd_max = lmd_max
@@ -24,36 +22,15 @@ class modelGrid:
         self.npars = npars
         self.par_dims = par_dims
         self.par_lims = par_lims
-        self.par_mask_function = par_mask_function
-        self.check_par_input()
-        self.get_par_grid()
+        self._check_par_input()
+        self._get_par_grid()
         p = self.pars.shape[-1]
         self.p = p
         self.min_n_p = np.min([n, p])
-        if X==None:
-            self.X = self.get_X(self.lmd[:, np.newaxis], self.pars)
-        if normalise_models is not False:
-            self.normalise(normalise_models)
+        self.X = X
         self.override_ticks = False
 
-    def add_constant(self, c):
-        self.X += c
-
-    def normalise(self, normalise_models):
-        if normalise_models==False:
-            pass
-        elif normalise_models=='column':
-            self.X = self.X/self.delta_lmd/np.sum(self.X, 0)
-        elif normalise_models=='volume':
-            par_widths_nd = np.meshgrid(*self.par_widths, indexing='ij')
-            par_vols = np.product(np.array(par_widths_nd), axis=0)
-            par_vols = np.ravel(par_vols)
-            self.par_vols = par_vols
-            self.X *= par_vols
-        else:
-            raise ValueError('unkown normalise option')
-
-    def check_par_input(self):
+    def _check_par_input(self):
         check = (len(self.par_dims) == self.npars)
         if check is False:
             raise ValueError('par_dims is wrong length')
@@ -68,10 +45,7 @@ class modelGrid:
             self.par_mask_function(tmp)
         pass
 
-    def par_description(self):
-        print(self.par_string)
-
-    def get_par_grid(self, par_edges=None):
+    def _get_par_grid(self, par_edges=None):
         # get param grid
         par_widths = []
         par_cents = []
@@ -112,89 +86,6 @@ class modelGrid:
         self.par_idx = par_idx
         self.pars = pars
 
-    def get_X(self, lmd, pars):
-        """Placeholder for get_X"""
-        pass
-
-    def plot_models(self,
-                    ax=None,
-                    kw_plot={'color':'k',
-                             'alpha':0.1}):
-        if ax==None:
-            ax = plt.gca()
-        ax.plot(self.lmd, self.X, **kw_plot)
-        ax.set_xlabel('$\lambda$')
-        plt.show()
-
-    def reshape_beta(self, beta):
-        shape = beta.shape
-        if shape[-1]!=self.p:
-            raise ValueError('beta must have shape (..., {0})'.format(self.p))
-        dims = tuple(shape[0:-1]) + tuple(self.par_dims)
-        beta_reshape = np.zeros(dims)
-        idx = tuple([slice(0,None) for i in range(len(beta.shape)-1)])
-        idx += tuple([self.par_idx[i] for i in range(self.npars)])
-        beta_reshape[idx] = beta
-        return beta_reshape
-
-    def get_finite_difference_tikhonov_matrix(self,
-                                              axis=None,
-                                              n=0,
-                                              ax_weights=None):
-
-        # the axes over which we want to regularise
-        if axis is None:
-            axis = list(range(self.npars))
-        n_ax = len(axis)
-
-        # n = order of regularisation
-        # i.e. we minimise the sum of squared n'th derivs
-        if type(n) is int:
-            n = n * np.ones(n_ax, dtype=int)
-        else:
-            n = np.array(n, dtype=int)
-            assert len(n)==n_ax
-
-        # relative weight of regularisation in each axis
-        if ax_weights is None:
-            ax_weights = np.ones(n_ax)
-
-        # make C distance array
-        # C[n, i, j] = signed distance in n'th parameter between pixel i and j
-        shape = (self.npars, self.p, self.p)
-        C = np.full(shape, self.p+1, dtype=int)
-        for i in range(self.npars):
-            pi = self.par_idx[i]
-            Ci = pi - pi[:, np.newaxis]
-            C[i, :, :] = Ci
-
-        # make D distance arary
-        # D[n, i, j] = { C[n, i, j] if other {1,...N}-{n} parameters are equal
-        #              { self.p+1 otherwise (this won't interfere with T calc.)
-        shape = (len(axis), self.p, self.p)
-        D = np.full(shape, self.p+1, dtype=int)
-        all_axes = set(range(self.npars))
-        for i, ax0 in enumerate(axis):
-            other_axes = all_axes - set([ax0])
-            slice = np.sum(np.abs(C[tuple(other_axes), :, :]), 0)
-            slice = np.where(slice==0)
-            D[i][slice] = C[ax0][slice]
-
-        # make tikhanov matrix
-        shape = (len(axis), self.p, self.p)
-        T = np.zeros(shape, dtype=int)
-        for i, n0 in enumerate(n):
-            k = np.arange(n0+1)
-            d = int(np.ceil(n0/2.)) - k
-            t = (-1)**k * special.binom(n0, k)
-            for d0, t0 in zip(d, t):
-                T[i][D[i]==d0] = t0
-
-        # collapse along axes
-        T = np.sum(T.T * ax_weights, -1).T
-
-        return T
-
 class milesSSPs(modelGrid):
 
     def __init__(self,
@@ -205,9 +96,7 @@ class milesSSPs(modelGrid):
                  age_lim=None,
                  z_lim=None,
                  thin_age=1,
-                 thin_z=1,
-                 normalise_models=False):
-
+                 thin_z=1):
         ssps = read_miles.milesSSPs(mod_dir=miles_mod_directory,
                                     age_lim=age_lim,
                                     z_lim=z_lim,
@@ -235,15 +124,12 @@ class milesSSPs(modelGrid):
         self.par_dims = (ssps.nz, ssps.nt)
         self.par_lims = ((0,1), (0,1))
         self.par_mask_function = None
-        self.check_par_input()
-        self.get_par_grid(par_edges=par_edges)
+        self._check_par_input()
+        self._get_par_grid(par_edges=par_edges)
         p = self.pars.shape[-1]
         self.p = p
         self.min_n_p = np.min([n, p])
         self.X = ssps.X
-        # remaining pars from modgrid
-        if normalise_models is not False:
-            self.normalise(normalise_models)
         self.override_ticks = True
         self.set_tick_positions()
         tmp = self.par_edges[1]
@@ -332,9 +218,6 @@ class milesSSPs(modelGrid):
         self.n_fft = n_fft
         self.FXw = FXw
 
-    def normalise_to_median(self):
-        self.X /= np.median(self.X)
-
     def get_light_weights(self):
         light_weights = np.sum(self.X, 0)
         light_weights = np.reshape(light_weights, self.par_dims)
@@ -342,18 +225,16 @@ class milesSSPs(modelGrid):
         light_weights = light_weights.T
         self.light_weights = light_weights
 
-    def get_ssp_wavelength_spacing(self, ssp_id):
+    def get_ssp(self, ssp_id, spacing='wavelength'):
         id_z, id_t = self.par_idx[:,ssp_id]
         z = self.par_cents[0][id_z]
         t = self.par_cents[1][id_t]
-        spectrum = self.X[:,ssp_id]
-        return t, z, spectrum
-
-    def get_ssp_log_wavelength_spacing(self, ssp_id):
-        id_z, id_t = self.par_idx[:,ssp_id]
-        z = self.par_cents[0][id_z]
-        t = self.par_cents[1][id_t]
-        spectrum = self.Xw[:,ssp_id]
+        if spacing=='wavelength':
+            spectrum = self.X[:,ssp_id]
+        elif spacing=='log-wavelength':
+            spectrum = self.Xw[:,ssp_id]
+        else:
+            raise ValueError('Unknown choice for spacing')
         return t, z, spectrum
 
 

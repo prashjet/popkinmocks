@@ -1,5 +1,6 @@
 import pytest
 import numpy as np
+np.seterr(divide='ignore', invalid='ignore') # hide some warnings
 import popkinmocks as pkm
 
 def loop_over_dists(cube,

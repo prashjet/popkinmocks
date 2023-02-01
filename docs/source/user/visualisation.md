@@ -60,8 +60,8 @@ _ = cube.plot('t', sfh, '-o', xspacing='discrete')
 This is another wrapper around `matplotlib.pyplot.plot` but specifically for plotting spectra. This only takes a single argument: the y-axis data. In addition to axis labelling, this wrapper determines whether the data are sampled in wavelength or log-wavelength. It can be used in both cases:
 
 ```{code-cell}
-t1, z1, spec1 = ssps.get_ssp_wavelength_spacing(103)
-t2, z2, spec2 = ssps.get_ssp_log_wavelength_spacing(463)
+t1, z1, spec1 = ssps.get_ssp(103, spacing='wavelength')
+t2, z2, spec2 = ssps.get_ssp(463, spacing='log-wavelength')
 print(f'spec1 is sampled in wavelength and has shape {spec1.shape}')
 print(f'spec2 is sampled in log-wavelength and has shape {spec2.shape}')
 

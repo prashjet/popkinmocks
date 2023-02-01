@@ -3,19 +3,23 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to popkinmocks's documentation!
+popkinmocks
 =======================================
 
 `popkinmocks` is a toolkit to create models of the stellar content of galaxies and produce mock observations of Integral Field Unit (IFU) datacubes.
 
 Models in `popkinmocks` are distributions over stellar population and kinematic parameters. These can be created either using particle data from simulations, or a provided library of parametric galactic components. Given a model, `popkinmocks` provides tools to evaluate the stellar integrated-light contribution to the IFU datacube, and derived properties of the distribution such as (mass or light weighted) moments, and conditional and marginal probability functions.
 
-User Guide
-==================
+`popkinmocks` is being actively developed in `a public repository on GitHub
+<https://github.com/prashjet/popkinmocks>`_ so if you have any trouble, `open
+an issue <https://github.com/prashjet/popkinmocks/issues>`_ there.
+
+Contents
+---------------------
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents:
+   :caption: User Guide:
 
    user/install
    user/citation.md
@@ -26,9 +30,21 @@ User Guide
    user/visualisation.md
    user/faqs.md
 
-Indices and tables
-==================
+.. toctree::
+   :maxdepth: 1
+   :caption: API Documentation:
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   api/cube_and_ssps
+   api/components
+   api/noise
+
+License & attribution
+---------------------
+
+Copyright 2023 Prashin Jethwa.
+
+The source code is made available under the terms of the MIT license.
+
+If you make use of this code, please cite this package and its dependencies. You
+can find more information about how and what to cite in the `citation
+<user/citation.md>`_ documentation.

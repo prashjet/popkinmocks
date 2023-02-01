@@ -15,7 +15,8 @@ kernelspec:
 
 +++
 
-How to cite _popkinmocks_ and its dependencies.
+A citation for _popkinmocks_ will come soon.
 
-* MILES SSPs
-* Zhu et al chemical evolution model
+Additionally, please cite [Vazdekis et al. 2010](https://ui.adsabs.harvard.edu/abs/2010MNRAS.404.1639V/exportcitation) for the MILES SSP models.
+
+If you use a `ParametricComponents` please cite [Zhu et al. 2020](https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/exportcitation) for the underlying chemical evolution model.
