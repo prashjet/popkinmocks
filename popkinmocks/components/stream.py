@@ -6,16 +6,16 @@ class Stream(parametric.ParametricComponent):
     """Stream with age-independent kinematics and spatially-uniform enrichment
 
     The mass-weighted density factorises as
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
+    
+    where:
+
     - p(t) : beta distribution (see `set_p_t`),
-    - p(x|t) = p(x): a curved line with constant thickness (see `set_p_x`),
+    - p(x|t) = p(x) : a curved line with constant thickness (see `set_p_x`),
     - p(v|t,x) = p(v|x) = Normal(v ; mu_v(x), sig_v(x)) where mean varies along
-    stream (see `set_mu_v`) and dispersion is constant (see `set_sig_v`)
-    - p(z|t,x) = p(z|t) = Normal(z ; mu_z(t, t_dep), sig_z(t, t_dep)) i.e.
-    chemical enrichment depends on a constant depletion timescale t_dep (see
-    `set_t_dep`). The functions mu_z(t,t_dep) and sig_z(t,t_dep) are from
-    equations 3-10 of Zhu et al. 20,
-    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
+      stream (see `set_mu_v`) and dispersion is constant (see `set_sig_v`)
+    - t_dep(x) = constant (see `set_t_dep`)
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -129,6 +129,3 @@ class Stream(parametric.ParametricComponent):
         nt = self.cube.ssps.par_dims[1]
         size = (nt, self.cube.nx, self.cube.ny)
         self.sig_v = sig_v * np.ones(size)
-
-
-# end

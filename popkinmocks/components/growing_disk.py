@@ -6,18 +6,18 @@ class GrowingDisk(parametric.ParametricComponent):
     """A growing disk with age-and-space dependent velocities and enrichments
 
     The mass-weighted density factorises as
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
+
+    where:
+
     - p(t) : beta distribution (see `set_p_t`),
-    - p(x|t) : cored power-law in elliptical radius with age-varying core-size,
-    flattening and slope (see `set_p_x_t`)
-    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where velocity mean resembles
-    a rotating disk (see `set_mu_v`) while dispersion varies as a power-law on
-    elliptical radius (see `set_sig_v`)
-    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
-    enrichment depends on a spatially varying depletion timescale t_dep(x) which
-    varies as as power law in eliptical radius (see `set_t_dep`). The functions
-    mu_z(t,t_dep) and sig_z(t,t_dep) are from equations 3-10 of Zhu et al. 20,
-    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
+    - p(x|t) : cored power-law in elliptical radius with age-varying core-size, 
+      flattening and slope (see `set_p_x_t`)    
+    - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where mu_v resembles a
+      rotating disk (see `set_mu_v`) while dispersion varies from inner to outer
+      values (see `set_sig_v`)
+    - t_dep(x) varies from inner to outer value (see `set_t_dep`)
 
     Args:
         cube: a pkm.mock_cube.mockCube.

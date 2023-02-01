@@ -38,18 +38,19 @@ class IFUCube(object):
         self.nv = nv
         self.v_edg = np.linspace(*vrng, nv+1)
         dv = self.v_edg[1] - self.v_edg[0]
-        self.ssps.logarithmically_resample(dv=dv)
-        self.ssps.calculate_fourier_transform()
+        self.ssps._logarithmically_resample(dv=dv)
+        self.ssps._calculate_fourier_transform()
         self.ssps.get_light_weights()
 
     def construct_volume_element(self, which_dist):
         """Construct volume element for converting densities to probabilties
 
         Args:
-            which_dist (string): which density to evaluate
+            which_dist (string): which distribution to evaluate volume element 
+                for e.g. 'vz' returns dv*dz, 't_x' returns dt
 
         Returns:
-            array: The volume element with correct shape for `which_dist`
+            array: The volume element shaped compatibly with `which_dist`
 
         """
         dist_is_conditional = '_' in which_dist
@@ -90,7 +91,7 @@ class IFUCube(object):
         """Get values of the variable v, x1, x2, t or z.
 
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_variable (string): one of (t, v, x1, x2, z)
 
         Returns:
             array: the discretisation values used for this variable
@@ -115,8 +116,8 @@ class IFUCube(object):
         """Get discretization bin edges of the variable v, x1, x2, t or z.
 
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
-
+            which_variable (string): one of (t, v, x1, x2, z)
+        
         Returns:
             array: the discretisation bin edges used for this variable
 
@@ -139,10 +140,10 @@ class IFUCube(object):
         """Get size of variable array
 
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_variable (string): one of (t, v, x1, x2, z)
 
         Returns:
-            array: the discretisation values used for this variable
+            array: the numer of discretisation elements for this variable
 
         """
         n = len(self.get_variable_values(which_variable))
@@ -155,7 +156,7 @@ class IFUCube(object):
             which_dist (string): a valid distribution string.
 
         Returns:
-            array: the discretisation values used for this variable
+            array: the shape of an array representing this distribution
 
         """
         which_dist = which_dist.replace('_', '')
@@ -171,12 +172,13 @@ class IFUCube(object):
         return shape
 
     def get_axis_label(self, which_dist):
-        """
+        """Get axis labels for plotting
+
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_variable (string): which variable, one of (t, v, x1, x2, z)
 
         Returns:
-            string: th
+            string: to be used in `ax.set_label`
 
         """
         if which_dist=='x1':
@@ -193,73 +195,78 @@ class IFUCube(object):
             raise ValueError('Unknown `which_dist`')
         return lab
 
-    def get_ticks(self, which_dist):
-        """
+    def _get_ticks(self, which_variable):
+        """Get tick positions and labels for plotting
+
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_variable (string): which variable, one of (t, v, x1, x2, z)
 
         Returns:
-            string: th
+            misc: if which_variable in [t,z] return ticks set in SSPs else
+                return the string 'default'
 
         """
-        if which_dist=='x1':
+        if which_variable=='x1':
             ticks = 'default'
-        elif which_dist=='x2':
+        elif which_variable=='x2':
             ticks = 'default'
-        elif which_dist=='t':
+        elif which_variable=='t':
             tick_pos = self.ssps.img_t_ticks
             tick_lab = self.ssps.t_ticks
             ticks = (tick_pos, tick_lab)
-        elif which_dist=='z':
+        elif which_variable=='z':
             tick_pos = self.ssps.img_z_ticks
             tick_lab = self.ssps.z_ticks
             ticks = (tick_pos, tick_lab)
-        elif which_dist=='v':
+        elif which_variable=='v':
             ticks = 'default'
         else:
-            raise ValueError('Unknown `which_dist`')
+            raise ValueError('Unknown `which_variable`')
         return ticks
 
-    def get_extent(self, which_dist):
-        """
+    def _get_extent(self, which_variable):
+        """Get variable extents for plotting images
+
         Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+            which_variable (string): which variable, one of (t, v, x1, x2, z)
 
         Returns:
-            string: th
+            tuple: (start, end) values of variable, i.e. outer most bin edges
 
         """
-        if which_dist=='x1':
+        if which_variable=='x1':
             ext = self.x1rng
-        elif which_dist=='x2':
+        elif which_variable=='x2':
             ext = self.x2rng
-        elif which_dist=='t':
+        elif which_variable=='t':
             edges = self.ssps.par_edges[1]
             ext = (edges[0], edges[-1])
-        elif which_dist=='z':
+        elif which_variable=='z':
             edges = self.ssps.par_edges[0]
             ext = (edges[0], edges[-1])
-        elif which_dist=='v':
+        elif which_variable=='v':
             ext = (self.v_edg[0], self.v_edg[-1])
         else:
-            raise ValueError('Unknown `which_dist`')
+            raise ValueError('Unknown `which_variable`')
         return ext
 
-    def get_image_extent(self, which_dist):
-        """
-        Args:
-            which_variable (string): which variable, one of v, x1, x2, t or z.
+    def _get_image_extent(self, which_variable):
+        """Get extent used for plotting images
+
+        Similar to `self._get_extent` except this returns (0,1) if the variable
+        is in [t,z] as these need special treatment due to irregular
+        discretization
 
         Returns:
-            string: th
+            tuple: (start, end) to be used with `plt.imshow`
 
         """
-        if which_dist in ['x1', 'x2', 'v']:
-            ext = self.get_extent(which_dist)
-        elif which_dist in ['t', 'z']:
+        if which_variable in ['x1', 'x2', 'v']:
+            ext = self._get_extent(which_variable)
+        elif which_variable in ['t', 'z']:
             ext = (0,1)
         else:
-            raise ValueError('Unknown `which_dist`')
+            raise ValueError('Unknown `which_variable`')
         return ext
 
     def imshow(self,
@@ -290,8 +297,8 @@ class IFUCube(object):
         if ax is None:
             ax = plt.gca()
         img = np.flipud(img.T)
-        extent = self.get_image_extent(view[0])
-        extent += self.get_image_extent(view[1])
+        extent = self._get_image_extent(view[0])
+        extent += self._get_image_extent(view[1])
         img = ax.imshow(img, extent=extent, **kwargs)
         if colorbar:
             cbar = plt.colorbar(img)
@@ -301,7 +308,7 @@ class IFUCube(object):
             ax.set_yticks([])
         else:
             for i, xy in enumerate(['x', 'y']):
-                ticks = self.get_ticks(view[i])
+                ticks = self._get_ticks(view[i])
                 if ticks != 'default':
                     tick_pos, tick_labs = ticks
                     getattr(ax, f'set_{xy}ticks')(tick_pos)
@@ -311,17 +318,17 @@ class IFUCube(object):
         return ax
 
     def plot(self, which_var, arr, *args, ax=None, xspacing='physical', **kwargs):
-        """Wrapper around `plt.plot` to label axis
+        """Wrapper around `plt.plot` to plot 1D plots and label axes
 
         Args:
-            which_var (string): x-axis variable, one of ['t','v','x1','x2','z']
+            which_var (string): x-axis variable, one of (t, v, x1, x2, z)
             arr (array): y-axis data to plot
-            *args: any extra
+            *args: any extra args passed to `plt.plot`
             ax (`matplotlib` axis): optional, axis to plot on
-            xspacing (string): optional, `physical` (default) or `discrete`.
-                If `physical`, x-axis is spaced in physical units, otherwise
-                with equally spaced points per variable discretization
-            **kwargs (dict): extra keyword parameters passed to `plt.plot`
+            xspacing (string, optional): `physical` or `discrete`. If 
+                `physical`, x-axis is spaced in physical units, otherwise
+                with equally spaced points per discretization point
+            **kwargs (dict): any extra kwargs passed to `plt.plot`
 
         Returns:
             a `matplotlib` `AxesImage` object
@@ -335,8 +342,8 @@ class IFUCube(object):
             ticks = 'default'
         elif xspacing=='discrete':
             x = np.linspace(0, 1, arr.size)
-            extent = self.get_extent(which_var)
-            ticks = self.get_ticks(which_var)
+            extent = self._get_extent(which_var)
+            ticks = self._get_ticks(which_var)
         img = ax.plot(x, arr, *args, **kwargs)
         if ticks!='default':
             tick_pos, tick_labs = ticks
@@ -347,7 +354,10 @@ class IFUCube(object):
         return ax
 
     def plot_spectrum(self, arr, *args, ax=None, **kwargs):
-        """Wrapper around `plt.plot` to label axis
+        """Wrapper around `plt.plot` to plot spectra
+        
+        Automatically selects if sampled in log-wavelength or wavelength and
+        chooses x-axis values appropriately
 
         Args:
             arr (array): y-axis data to plot
