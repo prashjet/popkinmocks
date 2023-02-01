@@ -8,7 +8,7 @@ Welcome to popkinmocks's documentation!
 
 `popkinmocks` is a toolkit to create models of the stellar content of galaxies and produce mock observations of Integral Field Unit (IFU) datacubes.
 
-Models are specified as distributions over stellar population and kinematic parameters, which can be created either (i) using a provided library of galactic component with parameterised forms of their morphologies, kinematics, star formation histories, and chemical enrichments, or (ii) using particle-data from simulations. Once you specify a model distribution, `popkinmocks` provides tools to evaluate the stellar integrated-light contribution to the IFU datacube, and derived properties of the distribution such as (mass or light weighted) marginal and conditional distributions, and moments.
+Models in `popkinmocks` are distributions over stellar population and kinematic parameters. These can be created either using particle data from simulations, or a provided library of parametric galactic components. Given a model, `popkinmocks` provides tools to evaluate the stellar integrated-light contribution to the IFU datacube, and derived properties of the distribution such as (mass or light weighted) moments, and conditional and marginal probability functions.
 
 User Guide
 ==================
@@ -21,7 +21,7 @@ User Guide
    user/citation.md
    user/background.md
    user/constructing_models.md
-   user/derived_properties.md
+   user/moments_prob_func.md
    user/datacube_noise.md
    user/visualisation.md
    user/faqs.md

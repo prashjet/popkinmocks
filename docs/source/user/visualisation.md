@@ -34,11 +34,11 @@ stream.set_mu_v()
 
 ## `cube.plot`
 
-This method is a wrapper around `matplotlib.pyplot.plot` which. You provide the x-axis variable as a string (any of `t`, `v`, `x1`, `x2` or `z`) along with the associated y-axis data:
+This method is a wrapper around `matplotlib.pyplot.plot`. You provide the x-axis variable as a string (any of `t`, `v`, `x1`, `x2` or `z`) along with the associated y-axis data:
 
 ```{code-cell}
 sfh = stream.get_p('t')
-cube.plot('t', sfh, '-o')
+_ = cube.plot('t', sfh, '-o')
 ```
 
 The wrapper inserts the the appropriate x-axis labels and values in physical units. Another option is to use an x-axis spacing which highlights the discretisation of the SSP models,
@@ -48,7 +48,7 @@ sfh = stream.get_p('t')
 _ = cube.plot('t', sfh, '-o', xspacing='discrete')
 ```
 
-In this case the wrapper adjusts the x-axis ticks to the correct positions. If you chose this `discrete` option, you can adjust the position of the ticks as follows:
+In this case the wrapper adjusts the x-axis ticks to the correct positions. If you chose this `xspacing='discrete'` option, you can adjust the position of the ticks as follows:
 
 ```{code-cell}
 cube.ssps.set_tick_positions(t_ticks=[1, 2, 3, 4, 5])
@@ -57,17 +57,18 @@ _ = cube.plot('t', sfh, '-o', xspacing='discrete')
 
 ## `cube.plot_spectrum`
 
-This is another wrapper around `matplotlib.pyplot.plot` but specifically for plotting spectra. This only takes a single argument - the y-axis data. In addition to axis labelling, this wrapper determines whether the data are sampled in wavelength or log-wavelength. It can be used in both cases:
+This is another wrapper around `matplotlib.pyplot.plot` but specifically for plotting spectra. This only takes a single argument: the y-axis data. In addition to axis labelling, this wrapper determines whether the data are sampled in wavelength or log-wavelength. It can be used in both cases:
 
 ```{code-cell}
 t1, z1, spec1 = ssps.get_ssp_wavelength_spacing(103)
 t2, z2, spec2 = ssps.get_ssp_log_wavelength_spacing(463)
-print(f'`spec1` is sampled in wavelength and has shape {spec1.shape}')
-print(f'`spec2` is sampled in log-wavelength and has shape {spec2.shape}')
+print(f'spec1 is sampled in wavelength and has shape {spec1.shape}')
+print(f'spec2 is sampled in log-wavelength and has shape {spec2.shape}')
 
 cube.plot_spectrum(spec1, '-o', label='$\lambda$ sampling')
 cube.plot_spectrum(spec2, '-o', label='$\log \lambda$ sampling')
-_ = plt.gca().legend()
+plt.gca().legend()
+_ = plt.gca().set_title('Two SSPs with different sampling')
 ```
 
 ## `cube.imshow`
@@ -80,7 +81,7 @@ _ = cube.imshow(p_x, interpolation='gaussian')
 ```
 
 :::{note}
-You can pass arbitrary keyword arguments to plotting wrappers e.g. `interpolation='gaussian'` in the above example. 
+You can pass keyword arguments to the `matplotlib` routines e.g. `interpolation='gaussian'` in the above example is passed to `matplotlib.pyplot.imshow`
 :::
 
 On-sky images are the default view offered by `cube.imshow` but any 2D combination of variables is possible. These are specified as a pair of strings (amongst `t`, `v`, `x1`, `x2` or `z`) corresponding to the $(x,y)$ axis of the image e.g. to plot the age-metallicity distribution:

@@ -11,7 +11,7 @@ kernelspec:
   name: python3
 ---
 
-# IFUs for Galaxy Stellar Light
+# Background
 
 This introduction provides some background about stellar populations, kinematics and the forward model to evaluate the integrated-light stellar contribution to IFU datacubes.
 
@@ -41,7 +41,7 @@ _ = plt.gca().set_xlabel('Wavelength [Ang.]')
 _ = plt.gca().set_ylabel('Flux')
 ```
 
-Stellar kinematics refer to the velocities and positions of stars within a galaxy. By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$, we can capture all relations between these four variables.
+Stellar kinematics refer to the velocities and positions of stars within a galaxy. The joint distribution $p(t, v, \textbf{x}, z)$ can provide a full description of the relations between stellar population and kinematic variables.
 
 ## IFU datacubes
 
@@ -62,7 +62,33 @@ where we have introduced notation for the:
 * spectrum of SSP with age $t$ and metallicity $z$, $S(\lambda ; t, z)$, and
 * speed of light, $c$.
 
-The two factors of $(1+v/c)$ in this equation arise from Doppler-shifting of light: the factor inside $S$ translates from the rest-frame to observed wavelengths given a LOS velocity $v$, while the pre-factor scales the flux, ensuring total luminosity is conserved. To see how equation $\eqref{eq:fwdmod}$ connects to the standard equation for spectral modelling [see here](faq_spec_modelling).
+The two factors of $(1+v/c)$ in this equation arise from Doppler-shifting of light: the factor inside $S$ translates from the rest-frame to observed wavelengths given a LOS velocity $v$, while the pre-factor scales the flux, ensuring total luminosity is conserved.
+
+## How is this connected to spectral modelling?
+
+By describing stellar populations and kinematics simultaneously via the joint distribution $p(t, v, \textbf{x}, z)$ we can encode complex relations between these four variables without imposing simplifying assumptions. One such assumption which is commonly used when modelling observed spectra is that at a fixed position, velocities and stellar populations are independent. This statement is equivalent to the factorisation:
+
+$$
+p(t, v, \textbf{x}, z) = p(\textbf{x}) p(v|\textbf{x}) p(t,z|\textbf{x})
+\tag{2}
+\label{eq:factor_p}
+$$
+
+which says that velocities and stellar populations only interact via their dependence on position.
+
+What happens if we insert the simplifying assumption shown in $\eqref{eq:factor_p}$ into the integral equation for the datacube i.e. equation $\eqref{eq:fwdmod}$? In this case, the integral can be factored as follows
+
+$$
+\begin{equation}
+  y(\textbf{x}, \lambda) = p(\textbf{x}) \int \frac{p(v|\textbf{x})}{1+v/c}
+  \left[\int \int 
+  p(t,z|\textbf{x}) S\left(\frac{\lambda}{1+v/c} ; t, z\right) 
+  \; \mathrm{d}t \; \mathrm{d}z \right]
+  \;\mathrm{d}v .   
+\end{equation}
+$$
+
+This is the forward-model is used in most typical analyses of binned spectra from IFU datacubes i.e. a binned spectrum extracted at a position $\textbf{x}$ is modelled as a superposition of SSPs weighted by $p(t,z|\textbf{x})$ and convolved with a single LOSVD $p(v|\textbf{x})$ which is independent of stellar populations.
 
 ## Evaluating datacubes using FFTs
 
@@ -82,11 +108,11 @@ $$
 \end{equation}
 $$
 
-where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are trivial re-labellings (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT), producing a datacube sampled in log wavelength $\omega$ rather than wavelength $\lambda$.
+where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are minor labellings of $y, p$ and $S$ (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT), producing a datacube sampled in log wavelength $\omega$ rather than wavelength $\lambda$.
 
 ## Discretisation
 
-The discretisation in age and metallicity is set by the SSP models; there are various options when instantiating SSP models to modify the range and sampling of these parameters. Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
+_popkinmocks_ perfroms calculations using discrete approximations to the continuous variables $(t, v, \textbf{x}, z)$. The discretisation in $t$ and $z$ is set by the SSP grid; there are options available when instantiating SSP models which modify the range and sampling of these parameters. Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
 
 ```{code-cell}
 cube = pkm.ifu_cube.IFUCube(

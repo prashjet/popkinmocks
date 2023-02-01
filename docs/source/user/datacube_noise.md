@@ -11,7 +11,7 @@ kernelspec:
   name: python3
 ---
 
-# Datacube Noise Models
+# Observation Noise
 
 Here we present noise models available in _popkinmocks_. Noise $\epsilon$ is added to the signal $\bar{y}$ to give the observed cube $y_\mathrm{obs}$, i.e.
 
@@ -26,7 +26,7 @@ $$
 \epsilon(\mathbf{x},\omega) \sim \mathcal{N}(0, \sigma(\mathbf{x},\omega)^2)
 $$
 
-We provide two models for $\sigma(\mathbf{x},\omega)$. We demonstrate these on the mixture model saved in the _Constructing Models_ page:
+We provide two models for $\sigma(\mathbf{x},\omega)$. We demonstrate these on the mixture model saved in the [Constructing Models](constructing_models.md) page:
 
 ```{code-cell}
 import numpy as np
