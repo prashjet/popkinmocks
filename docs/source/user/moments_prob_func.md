@@ -11,11 +11,6 @@ kernelspec:
   name: python3
 ---
 
-# Citing _popkinmocks_
+# Probability Functions \& Moments 
 
-+++
-
-How to cite _popkinmocks_ and its dependencies.
-
-* MILES SSPs
-* Zhu et al chemical evolution model
+Hello.
