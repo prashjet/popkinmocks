@@ -6,16 +6,16 @@ import os
 import dill
 
 class Component(object):
-    """A galaxy component specified by the (log) joint density p(t,x,v,z)
+    """A galaxy component specified by the (log) joint density p(t,v,x,z)
 
     Sub-classes of `Component` correspond to specific choices of p(t,x,v,z).
-    Main methods are `get_p` to evaluate probability functions and `get_{X}`
-    for `X` in [`mean`, variance`, `skewness`, `kurtosis`] to evaluate moments.
-
+    Main methods are `get_p` to evaluate probability functions and `get_mean`,
+    `get_variance`, `get_skewness`, `get_kurtosis` to get moments.
+    
     Args:
         cube: a pkm.mock_cube.mockCube.
         log_p_txvz (array): 5D array of natural log of mass-weighted probabilty
-            density p(t,x1,x2,v,z)
+            density i.e. log p(t,v,x1,x2,z)
 
     """
     def __init__(self, cube=None, log_p_tvxz=None):
@@ -32,19 +32,21 @@ class Component(object):
               which_dist,
               density=True,
               light_weighted=False):
-        """Evaluate population-kinematic distributions for this component
+        """Evaluate probability functions for this component
 
         Evaluate marginal or conditional distributions over stellar age t, 2D
         position x, velocity v and metallicity z. The argument `which_dist`
         specifies which distribution to evaluate, where an underscore (if
-        present) represents conditioning e.g.
+        present) represents conditioning e.g.:
+
         - `which_dist = 'tv'` --> p(t,v),
-        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc
+        
         Variables in `which_dist` must be provided in alphabetical order (on
         either side of the underscore if present).
 
         Args:
-            which_dist (string): which density to evaluate
+            which_dist (string): valid string for the distribution to evaluate
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -65,19 +67,21 @@ class Component(object):
         return p
 
     def get_log_p(self, which_dist, density=True, light_weighted=False):
-        """Evaluate log probability functions
+        """Evaluate log probability functions for this component
 
         Evaluate marginal or conditional distributions over stellar age t, 2D
         position x, velocity v and metallicity z. The argument `which_dist`
         specifies which distribution to evaluate, where an underscore (if
-        present) represents conditioning e.g.
-        - `which_dist = 'tv'` --> log p(t,v),
-        - `which_dist = 'tz_x'` --> log p(t,z|x) etc ...
+        present) represents conditioning e.g.:
+
+        - `which_dist = 'tv'` --> p(t,v),
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc
+        
         Variables in `which_dist` must be provided in alphabetical order (on
         either side of the underscore if present).
 
         Args:
-            which_dist (string): which density to evaluate
+            which_dist (string): valid string for the distribution to evaluate
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
@@ -90,21 +94,20 @@ class Component(object):
                 dimensions corresponding to [t,z,x1,x2].
 
         """
-        # TODO: error catching if the order of variables is not alphabetical
         is_conditional = '_' in which_dist
         if is_conditional:
-            log_p = self.get_log_conditional_distribution(
+            log_p = self._get_log_conditional_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
         else:
-            log_p = self.get_log_marginal_distribution(
+            log_p = self._get_log_marginal_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
         return log_p
 
-    def get_log_marginal_distribution(self,
+    def _get_log_marginal_distribution(self,
                                       which_dist,
                                       density=True,
                                       light_weighted=False):
@@ -129,7 +132,7 @@ class Component(object):
         log_p = log_p_func(density=density, light_weighted=light_weighted)
         return log_p
 
-    def get_log_conditional_distribution(self,
+    def _get_log_conditional_distribution(self,
                                          which_dist,
                                          light_weighted=False,
                                          density=True):
@@ -187,14 +190,13 @@ class Component(object):
 
         The `which_dist` string specifies which distribution to mean. If
         `which_dist` contains no underscore, this returns the mean of the
-        appropriate marginal distribution e.g.
+        appropriate marginal distribution. If `which_dist` contains an 
+        underscore, this returns the mean of the conditional distribution e.g.:
+
         - `which_dist = 'v'` returns E(v) = int v p(v) dv
-        If `which_dist` contains an underscore, this returns the mean of the
-        appropriate conditional distribution e.g.
         - `which_dist = 'v_x'` returns E(v|x) = int v p(v|x) dv
-        Only works for distributions of one argument i.e. one variable before
-        the underscore in `which_dist`.
-        Uses exact calculations if available for a given distribution.
+
+        Only works for distributions of one argument.
 
         Args:
             which_dist (string): which distribution to mean. See full docstring.
@@ -240,14 +242,13 @@ class Component(object):
         """Get noncentral moment of 1D distributions
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
-        and meaning of output. Uses exact calculations if available for a given
-        distribution.
+        and meaning of output.
 
         Args:
             which_dist (string): which distribution to take central moment of.
             mu (array): center about which to take moment about, with shape
                 broadcastable with conditioners of `which_dist` (if present)
-            j (int): which moment
+            j (int): moment order
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
 
@@ -293,11 +294,11 @@ class Component(object):
         """Get central moment of a 1D distribution
 
         See full docstring of `self.get_mean` for restrictions on `which_dist`
-        and meaning of output. Uses exact calculations if available for a given
-        distribution.
+        and meaning of output.
 
         Args:
             which_dist (string): which distribution to take central moment of.
+            j (int) : moment order
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
 
@@ -422,15 +423,16 @@ class Component(object):
     def evaluate_ybar(self):
         """Evaluate the datacube for this component
 
-        Evaluate the integral
-        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
-        where
-        omega = ln(wavelength)
-        s(omega ; t,z) are stored SSP templates
-        This integral is a convolution over velocity v, which we evaluate using
-        FFTs. FFTs of SSP templates are stored in`ssps.FXw` while FFTs of
-        (velocity part of) the density P(t,v,x,z) are evaluated here. Sets the
-        result to `self.ybar`.
+        This evaluates the full integral assuming a 5D joint density i.e.:
+
+        $$
+        \\bar{y}(x, \omega) = int S(\omega-v ; t,z) p(t,v,x,z) dv dt dz
+        $$
+
+        where $\omega = \log \lambda$. This integral is a convolution over 
+        velocity v, which we evaluate using FFTs. FFTs of SSP templates are 
+        stored in`ssps.FXw` while FFTs of (the velocity part of) the density
+        p(t,v,x,z) are evaluated here. Sets the result to `self.ybar`.
 
         """
         cube = self.cube
@@ -792,7 +794,10 @@ class Component(object):
         return log_p_z
 
     def dill_dump(self, fname, direc=None):
-        """Save the component as a dill dump
+        """Save the component using dill
+
+        Makes the directory if it does not already exist. Saves component there
+        using dill.
 
         Args:
             fname (string): filename
@@ -809,7 +814,7 @@ class Component(object):
 
         Saves various quantities about the cube and component in a `npz` file.
         The density $p(t,v,x,z)$ is rearranged to $p(x,v,z,t)$ for backward
-        compatibility with v0.0. Prefer `self.dill_dump` where possible.
+        compatibility with v0.0.
 
         Args:
             fname (string): filename

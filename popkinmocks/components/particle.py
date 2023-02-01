@@ -5,11 +5,9 @@ class FromParticle(base.Component):
     """A component from star particle data from simulations
 
     This is a wrapper around `base.Component` which makes a 5D histogram of the
-    particle data in (t, v, x, z) space. Particles should be mass-weighted i.e.
-    each particle should represent the same stellar mass. If this in not the 
-    case for your particle, you can provide the `weights` argument which should
-    re-weight particles so that they are mass-weighted. All particle data 
-    should be provided as 1D arrays of the same length and same particle order.
+    particle data in (t, v, x, z) space. Particles should be mass-weighted, 
+    else provide the `mass_weights` argument which should. All particle data 
+    should be provided as 1D arrays of the same length and ordering.
 
     Args:
         cube: a pkm.mock_cube.mockCube.

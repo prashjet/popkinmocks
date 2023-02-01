@@ -7,17 +7,21 @@ class ParametricComponent(base.Component):
     """Abstract class for parametrised galaxy components
 
     The mass-weighted density factorises as
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x), where:
+
+    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
+
+    where:
+
     - p(t) : beta distribution (see `set_p_t`),
-    - p(x|t) : function to be implemented in the `set_p_x_t` method of a
-    subclass, with the component `center` and `orientation` set at instantiation
+    - p(x|t) : function to be implemented in subclass's `set_p_x_t` method    
     - p(v|t,x) = Normal(v ; mu_v(t,x), sig_v(t,x)) where subclasses provide
-    specific implementations in their `set_mu_v` and `set_sig_v` methods,
-    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. chemical
-    enrichment depends on a spatially varying depletion timescale t_dep(x) to be
-    implemented in the `set_t_dep` method of subclass. The functions
-    mu_z(t,t_dep) and sig_z(t,t_dep) are from equations 3-10 of Zhu et al. 20,
-    https://ui.adsabs.harvard.edu/abs/2020MNRAS.496.1579Z/abstract
+      specific implementations in their `set_mu_v` and `set_sig_v` methods,
+    - p(z|t,x) = Normal(z ; mu_z(t, t_dep(x)), sig_z(t, t_dep(x))) i.e. 
+      chemical enrichment depends on a spatially varying depletion timescale 
+      t_dep(x) to be implemented in the `set_t_dep` method of subclass.
+    
+    The functions  mu_z(t,t_dep) and sig_z(t,t_dep) are from equations 3-10 of 
+    Zhu et al. 20.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -262,7 +266,7 @@ class ParametricComponent(base.Component):
         pass
 
     def evaluate_chemical_enrichment_model_base(self, t_dep):
-        """Set p(z|t,x) given enrichment model and spatially varying t_dep
+        """Evaluate chemical enrichment model for a t_dep(x) 
 
         Evaluates the chemical evolution model defined in equations 3-10 of
         Zhu et al 2020, parameterised by a spatially varying depletion
@@ -305,11 +309,9 @@ class ParametricComponent(base.Component):
         self.p_z_tx = p_z_tx
 
     def evaluate_chemical_enrichment_model(self, t_dep):
-        """Set p(z|t,x) given enrichment model and spatially varying t_dep
+        """Evaluate chemical enrichment model for a single t_dep
 
-        Evaluates the chemical evolution model defined in equations 3-10 of
-        Zhu et al 2020, parameterised by a spatially varying depletion
-        timescale created by `set_t_dep`.
+        Hacky wrapper around `self.evaluate_chemical_enrichment_model`
 
         """
         # pass array full of single provided t_dep
@@ -350,15 +352,14 @@ class ParametricComponent(base.Component):
         """Evaluate the datacube for this component
 
         Evaluate the integral
-        ybar(x, omega) = int_{-inf}^{inf} s(omega-v ; t,z) P(t,v,x,z) dv dt dz
-        where
-        omega = ln(wavelength)
-        s(omega ; t,z) are stored SSP templates
+
+        ybar(x, omega) = int s(omega-v ; t,z) p(t,x,z) p(v|t,x) dv dt dz
+        
         This integral is a convolution over velocity v, which we evaluate using
         Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
-        while FTs of the velocity factor P(v|t,x) of the density P(t,v,x,z)
-        are evaluated using the analytic expression of the FT of the normal
-        distribution. Sets the result to `self.ybar`.
+        while FTs of the velocity factor p(v|t,x) are evaluated using
+        analytic expressions of the FT of the normal distribution. Sets the 
+        result to `self.ybar`.
 
         """
         cube = self.cube
@@ -734,6 +735,8 @@ class ParametricComponent(base.Component):
     def get_central_moment_v_tx(self, j, light_weighted=False):
         """Get j'th central moment of p(v|t,x)
 
+        Uses analytic formula for moments of a mixture
+
         Args:
             j (int): order of moment
             light_weighted (bool): whether to return light-weighted (True) or
@@ -801,7 +804,7 @@ class ParametricComponent(base.Component):
     def get_noncentral_moment_v_tx(self, j, mu, light_weighted=False):
         """Get j'th noncentral moment of p(v|t,x) about arbitrary center mu
 
-        i.e. returns int v (v - mu(t,x))^j p(v|t,x) dx
+        int v (v - mu(t,x))^j p(v|t,x) dx
 
         Args:
             mu (array): arbitrary moment center, broadcastable with (nt,nx,ny)
@@ -982,7 +985,6 @@ class ParametricComponent(base.Component):
             array size (nt,nx1,nx2,nz)
 
         """
-        # TODO: generalise this in case mu[:,:,:,i] =/= mu[:,:,:,0] for all i
         moment = self.get_noncentral_moment_v_tx(
             j,
             mu[:,:,:,0],    # E(v|t,x,z) = E(v|t,x,z0)
@@ -1262,108 +1264,3 @@ class ParametricComponent(base.Component):
                             density=False)
         E_v_z = np.sum(E_v_txz*P_tx_z, (0,1,2))
         return E_v_z
-
-    def plot_density(self,
-                     vmin=0.1,
-                     vmax=3.,
-                     show_every_nth_time=4):
-        """Plot maps of the spatial density p(x|t) at several timesteps
-
-        Plot the density between the start/end times of disk growth, which
-        depends on the CDF of p(t). Skip every N steps between these points.
-
-        Args:
-            vmin: minimum velocity for colormap
-            vmax: maximum velocity for colormap
-            show_every_nth_time (int): number of timesteps to skip between plots
-
-        """
-        t_idx_list = np.arange(*self.t_pars['idx_start_end'],
-                               show_every_nth_time)
-        t_idx_list = t_idx_list[::-1]
-        kw_imshow = {'cmap':plt.cm.gist_heat,
-                     'norm':LogNorm(vmin=vmin, vmax=vmax)}
-        for t_idx in t_idx_list:
-            t = self.cube.ssps.par_cents[1][t_idx]
-            img = self.cube.imshow(self.p_x_t[:,:,t_idx], **kw_imshow)
-            plt.gca().set_title(f't={t}')
-            plt.tight_layout()
-            plt.show()
-        return
-
-    def plot_t_dep(self):
-        """Plot map of depletion timescale used for chemical enrichment
-        """
-        kw_imshow = {'cmap':plt.cm.jet}
-        img = self.cube.imshow(self.t_dep,
-                              colorbar_label='$t_\\mathrm{dep}$',
-                              **kw_imshow)
-        plt.tight_layout()
-        plt.show()
-        return
-
-    def plot_mu_v(self,
-                  show_every_nth_time=4,
-                  vmax=None):
-        """Plot maps of the mean velocity E[p(v|t,x)] at several timesteps
-
-        Plot the map between the start/end times of disk growth, which
-        depends on the CDF of p(t). Skip every N steps between these points.
-
-        Args:
-            vmax: maximum velocity for colormap
-            show_every_nth_time (int): number of timesteps to skip between plots
-
-        """
-        if vmax is None:
-            vmax = np.max(np.abs(self.mu_v_pars['vmax_lims']))
-        cube = self.cube
-        t_idx_list = np.arange(*self.t_pars['idx_start_end'],
-                               show_every_nth_time)
-        t_idx_list = t_idx_list[::-1]
-        kw_imshow = {'vmin':-vmax, 'vmax':vmax}
-        for t_idx in t_idx_list:
-            t = self.cube.ssps.par_cents[1][t_idx]
-            self.cube.imshow(self.mu_v[t_idx,:,:], **kw_imshow)
-            plt.gca().set_title(f't={t}')
-            plt.tight_layout()
-            plt.show()
-
-    def plot_sig_v(self,
-                   show_every_nth_time=4,
-                   vmin=None,
-                   vmax=None):
-        """Plot maps of the dispersion of p(v|t,x) at several timesteps
-
-        Plot the map between the start/end times of disk growth, which
-        depends on the CDF of p(t). Skip every N steps between these points.
-
-        Args:
-            vmax: minimum velocity for colormap
-            vmax: maximum velocity for colormap
-            show_every_nth_time (int): number of timesteps to skip between plots
-
-        """
-        cube = self.cube
-        t_idx_list = np.arange(*self.t_pars['idx_start_end'],
-                               show_every_nth_time)
-        t_idx_list = t_idx_list[::-1]
-        sigs = np.concatenate((
-            self.sig_v_pars['sig_v_in_lims'],
-            self.sig_v_pars['sig_v_out_lims']
-            ))
-        if vmin is None:
-            vmin = np.min(sigs)
-        if vmax is None:
-            vmax = np.max(sigs)
-        kw_imshow = {'cmap':plt.cm.jet,
-                     'vmin':vmin,
-                     'vmax':vmax}
-        for t_idx in t_idx_list:
-            t = cube.ssps.par_cents[1][t_idx]
-            cube.imshow(self.sig_v[t_idx,:,:], **kw_imshow)
-            plt.gca().set_title(f't={t}')
-            plt.tight_layout()
-            plt.show()
-
-# end

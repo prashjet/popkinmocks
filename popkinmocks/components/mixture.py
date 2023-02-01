@@ -6,7 +6,9 @@ class Mixture(base.Component):
     """A mixture component
 
     The mass-weighted density is a mixture, i.e.
+
     p(t,x,v,z) = sum_i w_i p_i(t,v,x,z)
+
     where w_i >= 0 and sum_i w_i = 1.
 
     Args:
@@ -30,6 +32,13 @@ class Mixture(base.Component):
         self.weights = weights
 
     def evaluate_ybar(self):
+        """Evaluate the datacube for this component
+
+        Evaluate the weighted sum
+
+        ybar(x, omega) = sum_i ybar_i
+        
+        """
         ybar = np.zeros_like(self.component_list[0].ybar)
         for comp, weight in zip(self.component_list, self.weights):
             ybar += weight * comp.ybar
@@ -40,35 +49,32 @@ class Mixture(base.Component):
               collapse_cmps=True,
               density=True,
               light_weighted=False):
-        """Evaluate probability functions
+        """Evaluate probability functions for this component
 
-        Evaluate marginal or conditional densities over: stellar age t, 2D
-        position x, velocity v and metallicity z. Argument `which_dist`
-        specifies which distribution to evaluate where underscore (if
-        present) represents conditioning e.g.
+        Evaluate marginal or conditional distributions over stellar age t, 2D
+        position x, velocity v and metallicity z. The argument `which_dist`
+        specifies which distribution to evaluate, where an underscore (if
+        present) represents conditioning e.g.:
+
         - `which_dist = 'tv'` --> p(t,v),
-        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc
+        
         Variables in `which_dist` must be provided in alphabetical order (on
-        either side of the underscore if present). The galaxy is a mixture model
-        i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` and `collapse_cmps`
-        controls whether or not the density is collapsed over the components `i`
+        either side of the underscore if present).
 
         Args:
-            which_dist (string): which density to evaluate
-            collapse_cmps (bool): whether to collapse component densities
-                together (True) or leave them in-tact (False)
+            which_dist (string): valid string for the distribution to evaluate
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
 
         Returns:
-            array: log of desired probability function. If `collapse_cmps=True`
-                array dimensions correspond to order of variables as provided in
-                `which_dist` string e.g. `which_dist = tz_x` returns p(t,z|x) as
-                a 4D array with dimensions corresponding to [t,z,x1,x2].
-                If `collapse_cmps=False` the zero'th dimension will index over
-                different galaxy components.
+            array: the desired distribution. Array dimensions correspond to the
+                order of variables as provided in `which_dist` string e.g.
+                `which_dist = tz_x` returns p(t,z|x) as a 4D array with
+                dimensions corresponding to [t,z,x1,x2]. If `collapse_cmps = 
+                False` the first dimension will index over mixture components.
 
         """
         log_p = self.get_log_p(
@@ -84,57 +90,54 @@ class Mixture(base.Component):
                   collapse_cmps=True,
                   density=True,
                   light_weighted=False):
-        """Evaluate log probability functions
+        """Evaluate log probability functions for this component
 
-        Evaluate log marginal or conditional densities over: stellar age t, 2D
-        position x, velocity v and metallicity z. Argument `which_dist`
-        specifies which distribution to evaluate where underscore (if
-        present) represents conditioning e.g.
+        Evaluate marginal or conditional distributions over stellar age t, 2D
+        position x, velocity v and metallicity z. The argument `which_dist`
+        specifies which distribution to evaluate, where an underscore (if
+        present) represents conditioning e.g.:
+
         - `which_dist = 'tv'` --> p(t,v),
-        - `which_dist = 'tz_x'` --> p(t,z|x) etc ...
+        - `which_dist = 'tz_x'` --> p(t,z|x) etc
+        
         Variables in `which_dist` must be provided in alphabetical order (on
-        either side of the underscore if present). The galaxy is a mixture model
-        i.e. `p(t,x,v,z) = Sum_i w_i  p_i(t,x,v,z)` and `collapse_cmps`
-        controls whether or not the density is collapsed over the components `i`
+        either side of the underscore if present).
 
         Args:
-            which_dist (string): which density to evaluate
-            collapse_cmps (bool): whether to collapse component densities
-                together (True) or leave them in-tact (False)
+            which_dist (string): valid string for the distribution to evaluate
             density (bool): whether to return probabilty density (True) or the
                 volume-element weighted probabilty (False)
             light_weighted (bool): whether to return light-weighted (True) or
                 mass-weighted (False) quantity
 
         Returns:
-            array: log of desired probability function. If `collapse_cmps=True`
-                array dimensions correspond to order of variables as provided in
-                `which_dist` string e.g. `which_dist = tz_x` returns p(t,z|x) as
-                a 4D array with dimensions corresponding to [t,z,x1,x2].
-                If `collapse_cmps=False` the zero'th dimension will index over
-                different galaxy components.
+            array: the desired distribution. Array dimensions correspond to the
+                order of variables as provided in `which_dist` string e.g.
+                `which_dist = tz_x` returns p(t,z|x) as a 4D array with
+                dimensions corresponding to [t,z,x1,x2]. If `collapse_cmps = 
+                False` the first dimension will index over mixture components.
 
         """
         is_conditional = '_' in which_dist
         if is_conditional:
-            log_p = self.get_log_conditional_distribution(
+            log_p = self._get_log_conditional_distribution(
                 which_dist,
                 density=density,
                 light_weighted=light_weighted)
         else:
             if light_weighted:
-                log_p = self.get_log_marginal_distribution_light_wtd(
+                log_p = self._get_log_marginal_distribution_light_wtd(
                     which_dist,
                     density=density)
             else:
-                log_p = self.get_log_marginal_distribution_mass_wtd(
+                log_p = self._get_log_marginal_distribution_mass_wtd(
                     which_dist,
                     density=density)
         if collapse_cmps:
             log_p = special.logsumexp(log_p, 0)
         return log_p
 
-    def get_log_marginal_distribution_mass_wtd(self,
+    def _get_log_marginal_distribution_mass_wtd(self,
                                                which_dist,
                                                density=True):
         """Evaluate component-wise mass-weighted log marginal distributions
@@ -162,7 +165,7 @@ class Mixture(base.Component):
             count += 1
         return log_p
 
-    def get_log_marginal_distribution_light_wtd(self,
+    def _get_log_marginal_distribution_light_wtd(self,
                                                 which_dist,
                                                 density=True):
         """Evaluate component-wise light-weighted log marginal distributions
@@ -185,7 +188,7 @@ class Mixture(base.Component):
         else:
             current_dist = 'txz'
             lw = self.cube.ssps.light_weights[na,:,na,na,:]
-        log_P_mw = self.get_log_marginal_distribution_mass_wtd(
+        log_P_mw = self._get_log_marginal_distribution_mass_wtd(
             current_dist,
             density=False)
         log_P_lw = log_P_mw + np.log(lw)
@@ -204,7 +207,7 @@ class Mixture(base.Component):
             log_P_lw -= np.log(volume_element)
         return log_P_lw
 
-    def get_log_conditional_distribution(self,
+    def _get_log_conditional_distribution(self,
                                          which_dist,
                                          light_weighted=False,
                                          density=True):
@@ -250,18 +253,17 @@ class Mixture(base.Component):
         return log_p_conditional
 
     def get_mean(self, which_dist, light_weighted=False):
-        """Get mean or conditional mean of a 1D distribution
+        """Get mean/conditional mean using exact formula for mixtures.
 
         The `which_dist` string specifies which distribution to mean. If
         `which_dist` contains no underscore, this returns the mean of the
-        appropriate marginal distribution e.g.
+        appropriate marginal distribution. If `which_dist` contains an 
+        underscore, this returns the mean of the conditional distribution e.g.:
+
         - `which_dist = 'v'` returns E(v) = int v p(v) dv
-        If `which_dist` contains an underscore, this returns the mean of the
-        appropriate conditional distribution e.g.
         - `which_dist = 'v_x'` returns E(v|x) = int v p(v|x) dv
-        Only works for distributions of one argument i.e. one variable before
-        the underscore in `which_dist`.
-        Uses exact calculations if available for a given distribution.
+
+        Only works for distributions of one argument.
 
         Args:
             which_dist (string): which distribution to mean. See full docstring.
@@ -282,7 +284,7 @@ class Mixture(base.Component):
             ])
         is_conditional = '_' in which_dist
         if light_weighted:
-            rw = self.get_light_reweightings()
+            rw = self._get_light_reweightings()
         else:
             rw = np.ones(self.n_cmps)
         if is_conditional is False:
@@ -310,7 +312,9 @@ class Mixture(base.Component):
             mean = np.sum(w_p_cond.T * rw * mu_i.T, -1).T / denom
         return mean
 
-    def get_light_reweightings(self):
+    def _get_light_reweightings(self):
+        """Light of each mixture component, needed for light-weighted moments
+        """
         p_tz = self.get_p('tz', light_weighted=False, density=False)
         p_tz_i = np.array([
             cmp.get_p('tz', light_weighted=False, density=False)
@@ -323,9 +327,8 @@ class Mixture(base.Component):
     def get_central_moment(self, which_dist, j, light_weighted=False):
         """Get central moment or conditional central moment of a 1D distribution
 
-        See full docstring of `self.get_mean` for restrictions on `which_dist`
-        and meaning of output. Uses exact calculations if available for a given
-        distribution/component.
+        Uses exact formula for mixture models. See full docstring of 
+        `self.get_mean` for restrictions on `which_dist` and meaning of output.
 
         Args:
             which_dist (string): which distribution to take central moment of.
@@ -348,7 +351,7 @@ class Mixture(base.Component):
         if is_conditional is False:
             mu_i = np.moveaxis(mu_i, 0, -1)
             if light_weighted:
-                rw = self.get_light_reweightings()
+                rw = self._get_light_reweightings()
                 moment = np.sum(self.weights * rw * mu_i, -1)
             else:
                 moment = np.sum(self.weights * mu_i, -1)

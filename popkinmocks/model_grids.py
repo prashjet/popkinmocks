@@ -87,23 +87,33 @@ class modelGrid:
         self.pars = pars
 
 class milesSSPs(modelGrid):
+    """MILES SSP models 
 
+    MILES models (Vazdekis et al. 2010) with BaSTI isochrones for base 
+    alpha-content (Pietrinferni et al. 2004) and a Chabrier (2003) IMF.
+
+    Args:
+        lmd_min (float) : min wavelength (Angstrom)
+        lmd_min (float) : max wavelength (Angstrom)
+        age_lim (tuple) : (min, max) ages to keep (Gyr)
+        z_lim (tuple) : (min, max) metallicities to keep [M/H]
+        thin_age (int) : only use every `thin_age`-th age in SSP grid
+        thin_z (int) : only use every `thin_z`-th metallicity in SSP grid
+
+    """
     def __init__(self,
-                 miles_mod_directory='MILES_BASTI_CH_baseFe',
-                 pix_per_bin=1,
                  lmd_min=4700,
                  lmd_max=6500,
                  age_lim=None,
                  z_lim=None,
                  thin_age=1,
                  thin_z=1):
-        ssps = read_miles.milesSSPs(mod_dir=miles_mod_directory,
+        ssps = read_miles.milesSSPs(mod_dir='MILES_BASTI_CH_baseFe',
                                     age_lim=age_lim,
                                     z_lim=z_lim,
                                     thin_age=thin_age,
                                     thin_z=thin_z)
         ssps.truncate_wavelengths(lmd_min=lmd_min, lmd_max=lmd_max)
-        ssps.bin_pixels(pix_per_bin=pix_per_bin)
         n = ssps.X.shape[0]
         self.ssps = ssps
         npars = 2
@@ -118,8 +128,8 @@ class milesSSPs(modelGrid):
         self.lmd = ssps.lmd
         self.delta_lmd = (self.lmd_max-self.lmd_min)/(n-1)
         self.npars = 2
-        t_edg = self.get_par_edge_lims(ssps.t_unq)
-        z_edg = self.get_par_edge_lims(ssps.z_unq)
+        t_edg = self._get_par_edge_lims(ssps.t_unq)
+        z_edg = self._get_par_edge_lims(ssps.z_unq)
         par_edges = [z_edg, t_edg]
         self.par_dims = (ssps.nz, ssps.nt)
         self.par_lims = ((0,1), (0,1))
@@ -137,7 +147,7 @@ class milesSSPs(modelGrid):
         tmp = self.par_edges[0]
         self.delta_z = tmp[1:] - tmp[:-1]
 
-    def get_par_edge_lims(self, x_cnt):
+    def _get_par_edge_lims(self, x_cnt):
         dx = x_cnt[1:] - x_cnt[:-1]
         x_edg_lo = x_cnt[1:] - dx/2.
         x_edg_hi = x_cnt[:-1] + dx/2.
@@ -152,6 +162,17 @@ class milesSSPs(modelGrid):
     def set_tick_positions(self,
                            t_ticks=None,
                            z_ticks=None):
+        """Set tick positions for use in plotting
+
+        These ticks positions are used when plotting SSPs variables (t,z) in
+        discrete units when using `cube.plot(..., spacing='discrete')` or 
+        when using `cube.imshow`.
+
+        Args:
+            t_ticks (list) : ages where you would like a tick (Gyr)
+            z_ticks (list) : metallicities where you'd like a tick [M/H]
+
+        """
         if t_ticks is None and hasattr(self, 't_ticks') is False:
             t_ticks = [0.1, 1, 5, 13]
         elif t_ticks is None:
@@ -187,7 +208,15 @@ class milesSSPs(modelGrid):
                                      self.par_edges[0],
                                      tmp)
 
-    def logarithmically_resample(self, dv=5.):
+    def _logarithmically_resample(self, dv=5.):
+        """Logarithmically resample the SSPs with given velocity spacing
+
+        Interpolates the SSPs with even spacing in log-wavelength set by dv
+
+        Args:
+            dv (float) : desired velocity spacing (km/s)
+
+        """
         speed_of_light = 299792.
         dw = dv/speed_of_light
         w_in = np.log(self.lmd)
@@ -204,7 +233,13 @@ class milesSSPs(modelGrid):
         self.w = w
         self.Xw = Xw
 
-    def calculate_fourier_transform(self, pad=False):
+    def _calculate_fourier_transform(self, pad=False):
+        """Get FFT of SSPs
+
+        Args:
+            pad : either False or string 'ppxf' to use the padding used in PPXF
+
+        """
         self.n_pix = len(self.w)
         if pad==False:
             n_fft = len(self.w)
@@ -219,6 +254,11 @@ class milesSSPs(modelGrid):
         self.FXw = FXw
 
     def get_light_weights(self):
+        """Calculate light weights L(t,z) = int_lmd S(lmd;t,z) d lmd
+
+        Sets the result to `self.light_weights`
+
+        """
         light_weights = np.sum(self.X, 0)
         light_weights = np.reshape(light_weights, self.par_dims)
         # transpose (z,t) --> (t,z) to match convention used for components
@@ -226,6 +266,13 @@ class milesSSPs(modelGrid):
         self.light_weights = light_weights
 
     def get_ssp(self, ssp_id, spacing='wavelength'):
+        """Get a single SSP model indexed by ssp_id
+
+        Args:
+            ssp_id (int): index of the SSP to be returned
+            spacing (string, optional): either 'wavelength' or 'log-wavelength'
+
+        """
         id_z, id_t = self.par_idx[:,ssp_id]
         z = self.par_cents[0][id_z]
         t = self.par_cents[1][id_t]
