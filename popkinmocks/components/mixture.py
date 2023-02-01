@@ -147,7 +147,7 @@ class Mixture(base.Component):
         count = 0
         zipped_cmp_wts = zip(self.component_list, self.weights)
         for i, (cmp, w) in enumerate(zipped_cmp_wts):
-            log_p_func = getattr(cmp, "get_log_p_" + which_dist)
+            log_p_func = getattr(cmp, "_get_log_p_" + which_dist)
             log_pi = np.log(w) + log_p_func(density=density, light_weighted=False)
             if count == 0:
                 log_p = np.zeros((self.n_cmps,) + log_pi.shape)

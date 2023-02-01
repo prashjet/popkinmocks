@@ -134,7 +134,7 @@ class ParametricComponent(base.Component):
         """
         pass
 
-    def get_log_p_x_t(self, density=True, light_weighted=False):
+    def _get_log_p_x_t(self, density=True, light_weighted=False):
         """Get log p(x|t)
 
         Args:
@@ -150,10 +150,10 @@ class ParametricComponent(base.Component):
         if light_weighted is False:
             log_p_x_t = self.log_p_x_t.copy()
         else:
-            log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
+            log_p_txz = self._get_log_p_txz(density=True, light_weighted=True)
             log_dz = np.log(self.cube.construct_volume_element("z"))
             log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
-            log_p_t = self.get_log_p_t(density=True, light_weighted=True)
+            log_p_t = self._get_log_p_t(density=True, light_weighted=True)
             log_p_x_t = (log_p_tx.T - log_p_t).T
             log_p_x_t = np.moveaxis(log_p_x_t, 0, -1)
         if density is False:
@@ -176,7 +176,7 @@ class ParametricComponent(base.Component):
         """
         pass
 
-    def get_log_p_v_tx(self, density=True, light_weighted=False):
+    def _get_log_p_v_tx(self, density=True, light_weighted=False):
         """Get log p(v|t,x)
 
         Args:
@@ -198,7 +198,7 @@ class ParametricComponent(base.Component):
             log_cdf = np.array([log_cdf_1, log_cdf_0]).T
             log_p_v_tx = special.logsumexp(log_cdf, -1, b=[1, -1]).T
         else:
-            log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=True)
+            log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=True)
             log_p_tvx = special.logsumexp(log_p_tvxz, -1)
             log_p_tx = special.logsumexp(log_p_tvx, 1)
             na = np.newaxis
@@ -305,7 +305,7 @@ class ParametricComponent(base.Component):
         p_z_t = p_z_tx[:, :, 0, 0]
         return p_z_t
 
-    def get_log_p_z_tx(self, density=True, light_weighted=False):
+    def _get_log_p_z_tx(self, density=True, light_weighted=False):
         """Get log p(z|t,x)
 
         Args:
@@ -321,7 +321,7 @@ class ParametricComponent(base.Component):
         if light_weighted is False:
             log_p_z_tx = self.log_p_z_tx.copy()  # = density
         else:
-            log_p_txz = self.get_log_p_txz(density=True, light_weighted=True)
+            log_p_txz = self._get_log_p_txz(density=True, light_weighted=True)
             log_dz = np.log(self.cube.construct_volume_element("z"))
             log_p_tx = special.logsumexp(log_p_txz + log_dz, -1)
             log_p_z_tx = (log_p_txz.T - log_p_tx.T).T
@@ -365,7 +365,7 @@ class ParametricComponent(base.Component):
         ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
         self.ybar = ybar
 
-    def get_log_p_t(self, density=True, light_weighted=False):
+    def _get_log_p_t(self, density=True, light_weighted=False):
         """Get log p(t)
 
         Args:
@@ -381,14 +381,14 @@ class ParametricComponent(base.Component):
         if light_weighted is False:
             log_p_t = self.log_p_t.copy()
         else:
-            log_p_tz = self.get_log_p_tz(density=True, light_weighted=True)
+            log_p_tz = self._get_log_p_tz(density=True, light_weighted=True)
             log_dz = np.log(self.cube.construct_volume_element("z"))
             log_p_t = special.logsumexp(log_p_tz + log_dz, 1)
         if density is False:
             log_p_t += np.log(self.cube.construct_volume_element("t"))
         return log_p_t
 
-    def get_log_p_tv(self, density=True, light_weighted=False):
+    def _get_log_p_tv(self, density=True, light_weighted=False):
         """Get log p(t,v)
 
         Args:
@@ -401,13 +401,13 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvx = self.get_log_p_tvx(density=density, light_weighted=light_weighted)
+        log_p_tvx = self._get_log_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             log_p_tvx += np.log(self.cube.dx) + np.log(self.cube.dy)
         log_p_tv = special.logsumexp(log_p_tvx, (-1, -2))
         return log_p_tv
 
-    def get_log_p_tx(self, density=True, light_weighted=False):
+    def _get_log_p_tx(self, density=True, light_weighted=False):
         """Get log p(t,x)
 
         Args:
@@ -421,18 +421,18 @@ class ParametricComponent(base.Component):
 
         """
         if light_weighted is False:
-            log_p_x_t = self.get_log_p_x_t(density=density, light_weighted=False)
-            log_p_t = self.get_log_p_t(density=density, light_weighted=False)
+            log_p_x_t = self._get_log_p_x_t(density=density, light_weighted=False)
+            log_p_t = self._get_log_p_t(density=density, light_weighted=False)
             log_p_tx = log_p_x_t + log_p_t
             log_p_tx = np.moveaxis(log_p_tx, -1, 0)
         else:
-            log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
+            log_p_txz = self._get_log_p_txz(density=density, light_weighted=True)
             if density is True:
                 log_p_txz += np.log(self.cube.construct_volume_element("z"))
             log_p_tx = special.logsumexp(log_p_txz, -1)
         return log_p_tx
 
-    def get_log_p_tz(self, density=True, light_weighted=False):
+    def _get_log_p_tz(self, density=True, light_weighted=False):
         """Get log p(t,z)
 
         Args:
@@ -445,13 +445,13 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_txz = self.get_log_p_txz(density=density, light_weighted=light_weighted)
+        log_p_txz = self._get_log_p_txz(density=density, light_weighted=light_weighted)
         if density is True:
             log_p_txz += np.log(self.cube.dx) + np.log(self.cube.dy)
         log_p_tz = special.logsumexp(log_p_txz, (1, 2))
         return log_p_tz
 
-    def get_log_p_tvx(self, density=True, light_weighted=False):
+    def _get_log_p_tvx(self, density=True, light_weighted=False):
         """Get log p(t,v,x)
 
         Args:
@@ -465,18 +465,18 @@ class ParametricComponent(base.Component):
 
         """
         if light_weighted is False:
-            log_p_tx = self.get_log_p_tx(density=density, light_weighted=False)
-            log_p_v_tx = self.get_log_p_v_tx(density=density, light_weighted=False)
+            log_p_tx = self._get_log_p_tx(density=density, light_weighted=False)
+            log_p_v_tx = self._get_log_p_v_tx(density=density, light_weighted=False)
             na = np.newaxis
             log_p_tvx = log_p_tx[:, na, :, :] + np.moveaxis(log_p_v_tx, 0, 1)
         else:
-            log_p_tvxz = self.get_log_p_tvxz(density=density, light_weighted=True)
+            log_p_tvxz = self._get_log_p_tvxz(density=density, light_weighted=True)
             if density is True:
                 log_p_tvxz += np.log(self.cube.construct_volume_element("z"))
             log_p_tvx = special.logsumexp(log_p_tvxz, -1)
         return log_p_tvx
 
-    def get_log_p_tvz(self, density=True, light_weighted=False):
+    def _get_log_p_tvz(self, density=True, light_weighted=False):
         """Get log p(t,v,z)
 
         Args:
@@ -489,13 +489,15 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=density, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(
+            density=density, light_weighted=light_weighted
+        )
         if density is True:
             log_p_tvxz += np.log(self.cube.dx) + np.log(self.cube.dy)
         log_p_tvz = special.logsumexp(log_p_tvxz, (2, 3))
         return log_p_tvz
 
-    def get_log_p_txz(self, density=True, light_weighted=False):
+    def _get_log_p_txz(self, density=True, light_weighted=False):
         """Get log p(t,x,z)
 
         Args:
@@ -509,11 +511,13 @@ class ParametricComponent(base.Component):
 
         """
         na = np.newaxis
-        log_p_tx = self.get_log_p_tx(density=density, light_weighted=False)
-        log_p_z_tx = self.get_log_p_z_tx(density=density, light_weighted=False)
+        log_p_tx = self._get_log_p_tx(density=density, light_weighted=False)
+        log_p_z_tx = self._get_log_p_z_tx(density=density, light_weighted=False)
         log_p_txz = log_p_tx[:, :, :, na] + np.moveaxis(log_p_z_tx, 0, -1)
         if light_weighted:
-            log_P_txz_mass_wtd = self.get_log_p_txz(density=False, light_weighted=False)
+            log_P_txz_mass_wtd = self._get_log_p_txz(
+                density=False, light_weighted=False
+            )
             light_weights = self.cube.ssps.light_weights[:, na, na, :]
             log_lw = np.log(light_weights)
             log_P_txz_light_wtd = log_P_txz_mass_wtd + log_lw
@@ -521,7 +525,7 @@ class ParametricComponent(base.Component):
             log_p_txz = log_p_txz + log_lw - log_normalisation
         return log_p_txz
 
-    def get_log_p_tvxz(self, density=True, light_weighted=False):
+    def _get_log_p_tvxz(self, density=True, light_weighted=False):
         """Get log p(t,v,x,z)
 
         Args:
@@ -535,12 +539,12 @@ class ParametricComponent(base.Component):
 
         """
         na = np.newaxis
-        log_p_txz = self.get_log_p_txz(density=density, light_weighted=False)
-        log_p_v_tx = self.get_log_p_v_tx(density=density, light_weighted=False)
+        log_p_txz = self._get_log_p_txz(density=density, light_weighted=False)
+        log_p_v_tx = self._get_log_p_v_tx(density=density, light_weighted=False)
         log_p_v_txz = log_p_v_tx[:, :, :, :, na]
         log_p_tvxz = np.moveaxis(log_p_v_txz, 0, 1) + log_p_txz[:, na, :, :, :]
         if light_weighted:
-            log_P_tvxz_mass_wtd = self.get_log_p_tvxz(
+            log_P_tvxz_mass_wtd = self._get_log_p_tvxz(
                 density=False, light_weighted=False
             )
             light_weights = self.cube.ssps.light_weights[:, na, na, na, :]
@@ -550,7 +554,7 @@ class ParametricComponent(base.Component):
             log_p_tvxz = log_p_tvxz + log_lw - log_normalisation
         return log_p_tvxz
 
-    def get_log_p_v(self, density=True, light_weighted=False):
+    def _get_log_p_v(self, density=True, light_weighted=False):
         """Get log p(v)
 
         Args:
@@ -563,7 +567,7 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvx = self.get_log_p_tvx(density=density, light_weighted=light_weighted)
+        log_p_tvx = self._get_log_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             log_dt = np.log(self.cube.construct_volume_element("t"))
             log_p_tvx = (log_p_tvx.T + log_dt).T
@@ -571,7 +575,7 @@ class ParametricComponent(base.Component):
         log_p_tvx = special.logsumexp(log_p_tvx, (0, 2, 3))
         return log_p_tvx
 
-    def get_log_p_vx(self, density=True, light_weighted=False):
+    def _get_log_p_vx(self, density=True, light_weighted=False):
         """Get log p(v,x)
 
         Args:
@@ -584,14 +588,14 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvx = self.get_log_p_tvx(density=density, light_weighted=light_weighted)
+        log_p_tvx = self._get_log_p_tvx(density=density, light_weighted=light_weighted)
         if density is True:
             log_dt = np.log(self.cube.construct_volume_element("t"))
             log_p_tvx = (log_p_tvx.T + log_dt).T
         log_p_tvx = special.logsumexp(log_p_tvx, 0)
         return log_p_tvx
 
-    def get_log_p_vz(self, density=True, light_weighted=False):
+    def _get_log_p_vz(self, density=True, light_weighted=False):
         """Get log p(v,z)
 
         Args:
@@ -604,13 +608,13 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_vxz = self.get_log_p_vxz(density=density, light_weighted=light_weighted)
+        log_p_vxz = self._get_log_p_vxz(density=density, light_weighted=light_weighted)
         if density:
             log_p_vxz += np.log(self.cube.dx) + np.log(self.cube.dy)
         log_p_vz = special.logsumexp(log_p_vxz, (1, 2))
         return log_p_vz
 
-    def get_log_p_vxz(self, density=True, light_weighted=False):
+    def _get_log_p_vxz(self, density=True, light_weighted=False):
         """Get log p(v,x,z)
 
         Args:
@@ -623,14 +627,16 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=density, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(
+            density=density, light_weighted=light_weighted
+        )
         if density:
             log_dt = np.log(self.cube.construct_volume_element("t"))
             log_p_tvxz = (log_p_tvxz.T + log_dt).T
         log_p_vxz = special.logsumexp(log_p_tvxz, 0)
         return log_p_vxz
 
-    def get_log_p_x(self, density=True, light_weighted=False):
+    def _get_log_p_x(self, density=True, light_weighted=False):
         """Get log p(x)
 
         Args:
@@ -644,11 +650,11 @@ class ParametricComponent(base.Component):
 
         """
         if light_weighted is False:
-            log_p_x_t = self.get_log_p_x_t(density=density)
-            log_P_t = self.get_log_p_t(density=False)
+            log_p_x_t = self._get_log_p_x_t(density=density)
+            log_P_t = self._get_log_p_t(density=False)
             log_p_x = special.logsumexp(log_p_x_t + log_P_t, -1)
         else:
-            log_p_txz = self.get_log_p_txz(density=density, light_weighted=True)
+            log_p_txz = self._get_log_p_txz(density=density, light_weighted=True)
             if density is True:
                 log_dtdz = np.log(self.cube.construct_volume_element("tz"))
                 na = np.newaxis
@@ -656,7 +662,7 @@ class ParametricComponent(base.Component):
             log_p_x = special.logsumexp(log_p_txz, (0, 3))
         return log_p_x
 
-    def get_log_p_xz(self, density=True, light_weighted=False):
+    def _get_log_p_xz(self, density=True, light_weighted=False):
         """Get log p(x,z)
 
         Args:
@@ -669,14 +675,14 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_txz = self.get_log_p_txz(density=density, light_weighted=light_weighted)
+        log_p_txz = self._get_log_p_txz(density=density, light_weighted=light_weighted)
         if density:
             log_dt = np.log(self.cube.construct_volume_element("t"))
             log_p_txz = (log_p_txz.T + log_dt).T
         log_p_xz = special.logsumexp(log_p_txz, 0)
         return log_p_xz
 
-    def get_log_p_z(self, density=True, light_weighted=False):
+    def _get_log_p_z(self, density=True, light_weighted=False):
         """Get log p(z)
 
         Args:
@@ -689,7 +695,7 @@ class ParametricComponent(base.Component):
             array
 
         """
-        log_p_tz = self.get_log_p_tz(density=density, light_weighted=light_weighted)
+        log_p_tz = self._get_log_p_tz(density=density, light_weighted=light_weighted)
         if density:
             log_dt = np.log(self.cube.construct_volume_element("t"))
             log_p_tz = (log_p_tz.T + log_dt).T

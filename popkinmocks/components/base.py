@@ -123,7 +123,7 @@ class Component(object):
 
         """
         # TODO: check that `which_dist` has no underscore and is alphabetical
-        log_p_func = getattr(self, "get_log_p_" + which_dist)
+        log_p_func = getattr(self, "_get_log_p_" + which_dist)
         log_p = log_p_func(density=density, light_weighted=light_weighted)
         return log_p
 
@@ -151,7 +151,7 @@ class Component(object):
         dist, marginal = which_dist.split("_")
         # if the conditional distribution is hard coded, then use that...
         try:
-            log_p_func = getattr(self, "get_log_p_" + which_dist)
+            log_p_func = getattr(self, "_get_log_p_" + which_dist)
             log_p_cond = log_p_func(density=density, light_weighted=light_weighted)
         # ... otherwise compute conditional = joint/marginal
         except (AttributeError, NotImplementedError):
@@ -460,7 +460,7 @@ class Component(object):
         y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
         self.ybar = y
 
-    def get_log_p_t(self, density=True, light_weighted=False):
+    def _get_log_p_t(self, density=True, light_weighted=False):
         """Get log p(t)
 
         Args:
@@ -473,13 +473,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_t = special.logsumexp(log_p_tvxz, (1, 2, 3, 4))
         if density:
             log_p_t -= np.log(self.cube.ssps.delta_t)
         return log_p_t
 
-    def get_log_p_tv(self, density=True, light_weighted=False):
+    def _get_log_p_tv(self, density=True, light_weighted=False):
         """Get log p(t,v)
 
         Args:
@@ -492,13 +492,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_tv = special.logsumexp(log_p_tvxz, (2, 3, 4))
         if density:
             log_p_tv -= np.log(self.cube.construct_volume_element("tv"))
         return log_p_tv
 
-    def get_log_p_tx(self, density=True, light_weighted=False):
+    def _get_log_p_tx(self, density=True, light_weighted=False):
         """Get log p(t,x)
 
         Args:
@@ -511,13 +511,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_tx = special.logsumexp(log_p_tvxz, (1, 4))
         if density:
             log_p_tx -= np.log(self.cube.construct_volume_element("tx"))
         return log_p_tx
 
-    def get_log_p_tz(self, density=True, light_weighted=False):
+    def _get_log_p_tz(self, density=True, light_weighted=False):
         """Get log p(t,z)
 
         Args:
@@ -530,13 +530,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_tz = special.logsumexp(log_p_tvxz, (1, 2, 3))
         if density:
             log_p_tz -= np.log(self.cube.construct_volume_element("tz"))
         return log_p_tz
 
-    def get_log_p_tvx(self, density=True, light_weighted=False):
+    def _get_log_p_tvx(self, density=True, light_weighted=False):
         """Get log p(t,v,x)
 
         Args:
@@ -549,13 +549,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_tvx = special.logsumexp(log_p_tvxz, 4)
         if density:
             log_p_tvx -= np.log(self.cube.construct_volume_element("tvx"))
         return log_p_tvx
 
-    def get_log_p_tvz(self, density=True, light_weighted=False):
+    def _get_log_p_tvz(self, density=True, light_weighted=False):
         """Get log p(t,v,z)
 
         Args:
@@ -568,13 +568,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_tvz = special.logsumexp(log_p_tvxz, (2, 3))
         if density:
             log_p_tvz -= np.log(self.cube.construct_volume_element("tvz"))
         return log_p_tvz
 
-    def get_log_p_txz(self, density=True, light_weighted=False):
+    def _get_log_p_txz(self, density=True, light_weighted=False):
         """Get log p(t,x,z)
 
         Args:
@@ -587,13 +587,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_txz = special.logsumexp(log_p_tvxz, 1)
         if density:
             log_p_txz -= np.log(self.cube.construct_volume_element("txz"))
         return log_p_txz
 
-    def get_log_p_tvxz(self, density=True, light_weighted=False):
+    def _get_log_p_tvxz(self, density=True, light_weighted=False):
         """Get log p(t,v,x,z)
 
         Args:
@@ -619,7 +619,7 @@ class Component(object):
             log_p_tvxz -= log_dtvxz
         return log_p_tvxz
 
-    def get_log_p_v(self, density=True, light_weighted=False):
+    def _get_log_p_v(self, density=True, light_weighted=False):
         """Get log p(v)
 
         Args:
@@ -632,13 +632,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_v = special.logsumexp(log_p_tvxz, (0, 2, 3, 4))
         if density:
             log_p_v -= np.log(self.cube.construct_volume_element("v"))
         return log_p_v
 
-    def get_log_p_vx(self, density=True, light_weighted=False):
+    def _get_log_p_vx(self, density=True, light_weighted=False):
         """Get log p(v,x)
 
         Args:
@@ -651,13 +651,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_vx = special.logsumexp(log_p_tvxz, (0, 4))
         if density:
             log_p_vx -= np.log(self.cube.construct_volume_element("vx"))
         return log_p_vx
 
-    def get_log_p_vz(self, density=True, light_weighted=False):
+    def _get_log_p_vz(self, density=True, light_weighted=False):
         """Get log p(v,z)
 
         Args:
@@ -670,13 +670,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_vz = special.logsumexp(log_p_tvxz, (0, 2, 3))
         if density:
             log_p_vz -= np.log(self.cube.construct_volume_element("vz"))
         return log_p_vz
 
-    def get_log_p_vxz(self, density=True, light_weighted=False):
+    def _get_log_p_vxz(self, density=True, light_weighted=False):
         """Get log p(v,x,z)
 
         Args:
@@ -689,13 +689,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_vxz = special.logsumexp(log_p_tvxz, 0)
         if density:
             log_p_vxz -= np.log(self.cube.construct_volume_element("vxz"))
         return log_p_vxz
 
-    def get_log_p_x(self, density=True, light_weighted=False):
+    def _get_log_p_x(self, density=True, light_weighted=False):
         """Get log p(x)
 
         Args:
@@ -708,13 +708,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_x = special.logsumexp(log_p_tvxz, (0, 1, 4))
         if density:
             log_p_x -= np.log(self.cube.construct_volume_element("x"))
         return log_p_x
 
-    def get_log_p_xz(self, density=True, light_weighted=False):
+    def _get_log_p_xz(self, density=True, light_weighted=False):
         """Get log p(x,z)
 
         Args:
@@ -727,13 +727,13 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_xz = special.logsumexp(log_p_tvxz, (0, 1))
         if density:
             log_p_xz -= np.log(self.cube.construct_volume_element("xz"))
         return log_p_xz
 
-    def get_log_p_z(self, density=True, light_weighted=False):
+    def _get_log_p_z(self, density=True, light_weighted=False):
         """Get log p(z)
 
         Args:
@@ -746,7 +746,7 @@ class Component(object):
             array
 
         """
-        log_p_tvxz = self.get_log_p_tvxz(density=False, light_weighted=light_weighted)
+        log_p_tvxz = self._get_log_p_tvxz(density=False, light_weighted=light_weighted)
         log_p_z = special.logsumexp(log_p_tvxz, (0, 1, 2, 3))
         if density:
             log_p_z -= np.log(self.cube.construct_volume_element("z"))
