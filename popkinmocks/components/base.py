@@ -797,7 +797,7 @@ class Component(object):
         if os.path.isdir(direc) is False:
             os.mkdir(direc)
         v_edg = self.cube.v_edg
-        u_edg = np.log(1.0 + v_edg / self.ssps.speed_of_light)
+        u_edg = np.log(1.0 + v_edg / self.cube.ssps.speed_of_light)
         p_tvxz = self.get_p("tvxz", collapse_cmps=True, density=True)
         f_xvtz = np.moveaxis(p_tvxz, [0, 1, 2, 3, 4], [4, 2, 0, 1, 3])
         np.savez(
