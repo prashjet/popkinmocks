@@ -390,7 +390,7 @@ class Component(object):
         kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
         return kurtosis - 3.0
 
-    def evaluate_ybar(self):
+    def evaluate_ybar(self, batch=False):
         """Evaluate the datacube for this component
 
         This evaluates the full integral assuming a 5D joint density i.e.:
@@ -403,6 +403,9 @@ class Component(object):
         velocity v, which we evaluate using FFTs. FFTs of SSP templates are
         stored in`ssps.FXw` while FFTs of (the velocity part of) the density
         p(t,v,x,z) are evaluated here. Sets the result to `self.ybar`.
+
+        Args:
+            batch (bool, optional): evaluate datacube row by row, default False
 
         """
         cube = self.cube
@@ -455,9 +458,19 @@ class Component(object):
             bounds_error=True,
         )
         F_p_tvxz = interpolator(np.linspace(0, 1, F_s_w_tz.shape[1]))
-        F_y = F_s_w_tz * F_p_tvxz
-        y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
-        y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
+        if batch:
+            nl = ssps.Xw.shape[0]
+            y = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
+            dtz = dtz[:,:,:,0,:]
+            F_s_w_tz = F_s_w_tz[:,:,:,0,:]
+            for i in range(self.cube.ny):
+                F_y_i = F_s_w_tz * F_p_tvxz[:,:,:,i,:]
+                y_i = np.fft.irfft(F_y_i, ssps.n_fft, axis=1)
+                y[:,:,i] = np.sum(y_i * dtz,(0,3))*self.cube.dx*self.cube.dy
+        else:
+            F_y = F_s_w_tz * F_p_tvxz
+            y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
+            y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
         self.ybar = y
 
     def _get_log_p_t(self, density=True, light_weighted=False):

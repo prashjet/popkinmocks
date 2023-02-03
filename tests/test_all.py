@@ -114,4 +114,17 @@ def test_noise(my_galaxy):
     mad_const_snr = np.median(np.abs(eps_const_snr))
     assert mad_shot_noise > mad_const_snr
 
+def test_datacube_batch(my_galaxy, my_base_component):
+    """Check that batch calculated datacubes match unbatched version
+
+    """
+    disk = my_galaxy.component_list[0]
+    a = 1.* disk.ybar
+    disk.evaluate_ybar(batch=True)
+    assert np.allclose(a, disk.ybar)
+    base_cmp = my_base_component
+    a = 1.* base_cmp.ybar
+    base_cmp.evaluate_ybar(batch=True)
+    assert np.allclose(a, base_cmp.ybar)
+
 # end
