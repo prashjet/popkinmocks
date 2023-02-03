@@ -4,8 +4,8 @@ import numpy as np
 import popkinmocks as pkm
 from itertools import chain, combinations
 
-N_VELOCITY_BINS = 49
-VELOCITY_LIMIT = 1000
+N_VELOCITY_BINS = 39
+VELOCITY_LIMIT = 800.
 NX, NY = 4,5
 EVAL_YBAR = True
 

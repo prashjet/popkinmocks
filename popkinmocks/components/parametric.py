@@ -331,7 +331,7 @@ class ParametricComponent(base.Component):
             log_p_z_tx = (log_p_z_tx.T + log_dz).T
         return log_p_z_tx
 
-    def evaluate_ybar(self):
+    def evaluate_ybar(self, batch=False):
         """Evaluate the datacube for this component
 
         Evaluate the integral
@@ -343,6 +343,9 @@ class ParametricComponent(base.Component):
         while FTs of the velocity factor p(v|t,x) are evaluated using
         analytic expressions of the FT of the normal distribution. Sets the
         result to `self.ybar`.
+
+        Args:
+            batch (bool, optional): evaluate datacube row by row, default False
 
         """
         cube = self.cube
@@ -360,9 +363,23 @@ class ParametricComponent(base.Component):
         F_s_w_tz = ssps.FXw
         F_s_w_tz = np.reshape(F_s_w_tz, (-1,) + ssps.par_dims)
         # get FT of ybar
-        args = P_txz, F_p_v_tx, F_s_w_tz
-        F_ybar = np.einsum("txyz,wtxy,wzt->wxy", *args, optimize=True)
-        ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
+        if batch:
+            F_ybar = np.zeros(
+                (nl, self.cube.nx, self.cube.ny), 
+                dtype=np.cdouble)
+            nl = ssps.Xw.shape[0]
+            ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
+            for i in range(self.cube.ny):
+                args = P_txz[:,:,i,:], F_p_v_tx[:,:,:,i], F_s_w_tz
+                F_ybar_i = np.einsum("txz,wtx,wzt->wx", *args, optimize=True)
+                ybar[:,:,i] = np.fft.irfft(
+                    F_ybar_i, 
+                    self.cube.ssps.n_fft, 
+                    axis=0)
+        else:
+            args = P_txz, F_p_v_tx, F_s_w_tz
+            F_ybar = np.einsum("txyz,wtxy,wzt->wxy", *args, optimize=True)
+            ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
         self.ybar = ybar
 
     def _get_log_p_t(self, density=True, light_weighted=False):
