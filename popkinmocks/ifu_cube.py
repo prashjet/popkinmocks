@@ -31,12 +31,12 @@ class IFUCube(object):
         self.ny = nx2
         self.x1rng = x1rng
         self.x2rng = x2rng
-        x_edge = np.linspace(*x1rng, nx1+1)
+        x_edge = np.linspace(*x1rng, nx1 + 1)
         self.dx = x_edge[1] - x_edge[0]
-        self.x = x_edge[:-1] + self.dx/2.
-        y_edge = np.linspace(*x2rng, nx2+1)
+        self.x = x_edge[:-1] + self.dx / 2.0
+        y_edge = np.linspace(*x2rng, nx2 + 1)
         self.dy = y_edge[1] - y_edge[0]
-        self.y = y_edge[:-1] + self.dy/2.
+        self.y = y_edge[:-1] + self.dy / 2.0
         xx, yy = np.meshgrid(self.x, self.y, indexing="ij")
         self.xx = xx
         self.yy = yy

@@ -9,7 +9,8 @@ class ParametricComponent(base.Component):
 
     The mass-weighted density factorises as
 
-    p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
+    .. math::
+        p(t,x,v,z) = p(t) p(x|t) p(v|t,x) p(z|t,x)
 
     where:
 
@@ -331,12 +332,13 @@ class ParametricComponent(base.Component):
             log_p_z_tx = (log_p_z_tx.T + log_dz).T
         return log_p_z_tx
 
-    def evaluate_ybar(self, batch='none'):
+    def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
 
         Evaluate the integral
 
-        ybar(x, omega) = int s(omega-v ; t,z) p(t,x,z) p(v|t,x) dv dt dz
+        .. math::
+            \\bar{y}(x,\omega) = \int S(\omega-v;t,z) p(t,x,z) p(v|t,x) dvdtdz
 
         This integral is a convolution over velocity v, which we evaluate using
         Fourier transforms (FT). FTs of SSP templates are stored in`ssps.FXw`
@@ -345,8 +347,8 @@ class ParametricComponent(base.Component):
         result to `self.ybar`.
 
         Args:
-            batch (string, optional): one of 'none', 'column', 'spaxel' to 
-                evaluate datacube altogether, column-by-column or 
+            batch (string, optional): one of 'none', 'column', 'spaxel' to
+                evaluate datacube altogether, column-by-column or
                 spaxel-by-spaxel
 
         """
@@ -362,50 +364,46 @@ class ParametricComponent(base.Component):
         F_s_w_tz = ssps.FXw
         F_s_w_tz = np.reshape(F_s_w_tz, (-1,) + ssps.par_dims)
         # get FT of ybar
-        if batch=='none':
+        if batch == "none":
             omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
             exponent = -1j * self.mu_v * omega - 0.5 * (self.sig_v * omega) ** 2
             F_p_v_tx = np.exp(exponent)
             args = P_txz, F_p_v_tx, F_s_w_tz
             F_ybar = np.einsum("txyz,wtxy,wzt->wxy", *args, optimize=True)
             ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
-        elif batch=='column':
-            F_ybar = np.zeros(
-                (nl, self.cube.nx, self.cube.ny), 
-                dtype=np.cdouble)
+        elif batch == "column":
+            F_ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.cdouble)
             nl = ssps.Xw.shape[0]
             ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
             omega = omega[:, np.newaxis, np.newaxis]
             for i in range(self.cube.ny):
-                exponent = -1j * self.mu_v[:,:,i] * omega - 0.5 * (self.sig_v[:,:,i] * omega) ** 2
+                exponent = (
+                    -1j * self.mu_v[:, :, i] * omega
+                    - 0.5 * (self.sig_v[:, :, i] * omega) ** 2
+                )
                 F_p_v_tx = np.exp(exponent)
                 print(type(self), i, self.cube.ny)
-                args = P_txz[:,:,i,:], F_p_v_tx, F_s_w_tz
+                args = P_txz[:, :, i, :], F_p_v_tx, F_s_w_tz
                 F_ybar_i = np.einsum("txz,wtx,wzt->wx", *args, optimize=True)
-                ybar[:,:,i] = np.fft.irfft(
-                    F_ybar_i, 
-                    self.cube.ssps.n_fft, 
-                    axis=0)
-        elif batch=='spaxel':
-            F_ybar = np.zeros(
-                (nl, self.cube.nx, self.cube.ny), 
-                dtype=np.cdouble)
+                ybar[:, :, i] = np.fft.irfft(F_ybar_i, self.cube.ssps.n_fft, axis=0)
+        elif batch == "spaxel":
+            F_ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.cdouble)
             nl = ssps.Xw.shape[0]
             ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
             omega = omega[:, np.newaxis]
             for i in range(self.cube.nx):
                 for j in range(self.cube.ny):
-                    exponent = -1j * self.mu_v[:,i,j] * omega - 0.5 * (self.sig_v[:,i,j] * omega) ** 2
+                    exponent = (
+                        -1j * self.mu_v[:, i, j] * omega
+                        - 0.5 * (self.sig_v[:, i, j] * omega) ** 2
+                    )
                     F_p_v_tx = np.exp(exponent)
                     print(type(self), i, self.cube.nx, j, self.cube.ny)
-                    args = P_txz[:,i,j,:], F_p_v_tx, F_s_w_tz
+                    args = P_txz[:, i, j, :], F_p_v_tx, F_s_w_tz
                     F_ybar_i = np.einsum("tz,wt,wzt->w", *args, optimize=True)
-                    ybar[:,i,j] = np.fft.irfft(
-                        F_ybar_i, 
-                        self.cube.ssps.n_fft, 
-                        axis=0)
+                    ybar[:, i, j] = np.fft.irfft(F_ybar_i, self.cube.ssps.n_fft, axis=0)
         else:
-            raise ValueError('Unknown option for batch')
+            raise ValueError("Unknown option for batch")
         self.ybar = ybar
 
     def _get_log_p_t(self, density=True, light_weighted=False):

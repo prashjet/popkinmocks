@@ -8,9 +8,11 @@ class Mixture(base.Component):
 
     The mass-weighted density is a mixture, i.e.
 
-    p(t,x,v,z) = sum_i w_i p_i(t,v,x,z)
+    .. math::
+        p(t,x,v,z) = \sum_i w_i \; p_i(t,v,x,z)
 
-    where w_i >= 0 and sum_i w_i = 1.
+    where the w_i are weights (non-zero, sum-to-one) and p_i are the
+    corresponding components.
 
     Args:
         cube: a pkm.mock_cube.mockCube.
@@ -31,11 +33,13 @@ class Mixture(base.Component):
         self.weights = weights
 
     def evaluate_ybar(self):
-        """Evaluate the datacube for this component
+        """Evaluate the datacube for this component as a mixture
 
-        Evaluate the weighted sum
+        Since observation operator is linear, ybar is a mixture of the
+        component ybar's i.e.
 
-        ybar(x, omega) = sum_i ybar_i
+        .. math::
+            \\bar{y}(x, \omega) = \sum_i w_i \; \\bar{y}_i(x, \omega)
 
         """
         ybar = np.zeros_like(self.component_list[0].ybar)
