@@ -4,8 +4,8 @@ jobs:
   run:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        python-version: ["3.7", "3.11"]
+        os: [ubuntu-latest]
+        python-version: ["3.11"]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout

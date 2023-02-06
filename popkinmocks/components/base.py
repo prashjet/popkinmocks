@@ -348,7 +348,7 @@ class Component(object):
 
         """
         mu_3 = self.get_central_moment(which_dist, 3, light_weighted=light_weighted)
-        variance = self.get_central_moment(which_dist, 2, light_weighted=light_weighted)
+        variance = self.get_variance(which_dist, light_weighted=light_weighted)
         skewness = mu_3 / variance**1.5
         return skewness
 
@@ -368,7 +368,7 @@ class Component(object):
 
         """
         mu_4 = self.get_central_moment(which_dist, 4, light_weighted=light_weighted)
-        variance = self.get_central_moment(which_dist, 2, light_weighted=light_weighted)
+        variance = self.get_variance(which_dist, light_weighted=light_weighted)
         kurtosis = mu_4 / variance**2.0
         return kurtosis
 

@@ -39,6 +39,18 @@ def loop_over_dists(cube,
             # allow for nan in conditionals since denominator can be 0
             assert np.all(np.isclose(total_prob, 1.) | np.isnan(total_prob))
 
+
+def test_cube(my_cube):
+    """Test sizes of variable edge/value arrays are concordant
+
+    """
+    cube = my_cube
+    for var in ['t', 'v', 'x1', 'x2', 'z']:
+        var_edgs = cube.get_variable_edges(var)
+        var_cent = cube.get_variable_values(var)
+        assert var_edgs.size == var_cent.size + 1
+
+
 def test_normalisations(my_cube,
                         my_galaxy,
                         distribution_list,
@@ -92,8 +104,8 @@ def test_moments(my_cube,
             # velocity discretisation to allow for tests to run quickly
             assert median_error<0.08
         for dist in ['t', 'x', 'z', 't_x', 'x_tz', 'z_t']:
-            a = galaxy.get_kurtosis(dist, light_weighted=lw)
-            b = base_cmp.get_kurtosis(dist, light_weighted=lw)
+            a = galaxy.get_excess_kurtosis(dist, light_weighted=lw)
+            b = base_cmp.get_excess_kurtosis(dist, light_weighted=lw)
             error = (a-b)/a
             median_error = np.nanmedian(np.abs(error))
             print(dist, lw, median_error)
@@ -144,5 +156,37 @@ def test_datacube_batch(my_galaxy, my_base_component):
             component.evaluate_ybar(batch=batch_type)
             assert np.allclose(a, component.ybar)
 
+def test_from_particle(my_cube):
+    """Check that datacubes calculated in batches agrees with unbatched version
+
+    """
+    cube = my_cube
+    N = 10
+    t = np.random.uniform(0, 13, N) # age [Gyr]
+    v = np.random.normal(0, 200., N) # LOS velocity [km/s]
+    x1 = np.random.normal(0, 0.4, N) # x1 position [arbitary]
+    x2 = np.random.normal(0, 0.2, N) # x2 position [arbitary]
+    z = np.random.uniform(-2.5, 0.6, N) # metallicty [M/H]
+    simulation = pkm.components.FromParticle(cube, t, v, x1, x2, z)
+    p_tz = simulation.get_p('tz', density=True)
+    t_edg = cube.get_variable_edges('t')
+    z_edg = cube.get_variable_edges('z')
+    p_tz2, _, _ = np.histogram2d(t, z, bins=(t_edg, z_edg), density=True)
+    assert np.allclose(p_tz, p_tz2)
+
+
+def test_plotting(my_cube, my_base_component):
+    """Test plotting routines
+
+    """
+    base_cmp = my_base_component
+    cube = my_cube
+    p_tz = base_cmp.get_p('tz', density=False)
+    p_t = base_cmp.get_p('t', density=False)
+    ax_img = cube.imshow(p_tz, view=['t', 'z'])
+    ax_plt = cube.plot('t', p_t, xspacing='discrete')
+    lineplt_ydata = ax_plt.lines[0].get_ydata()
+    image2d_ydata = np.sum(ax_img.get_images()[0].get_array(), 0)
+    np.allclose(lineplt_ydata, image2d_ydata)
 
 # end
