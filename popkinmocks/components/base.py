@@ -390,7 +390,7 @@ class Component(object):
         kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
         return kurtosis - 3.0
 
-    def evaluate_ybar(self, batch=False):
+    def evaluate_ybar(self, batch='none'):
         """Evaluate the datacube for this component
 
         This evaluates the full integral assuming a 5D joint density i.e.:
@@ -439,10 +439,8 @@ class Component(object):
 
         validate_v_edg()
         na = np.newaxis
-        dtz = ssps.delta_t[:, na, na, na, na] * ssps.delta_z[na, na, na, na, :]
         F_s_w_tz = np.reshape(ssps.FXw, (-1,) + ssps.par_dims)
         F_s_w_tz = np.moveaxis(F_s_w_tz, -1, 0)
-        F_s_w_tz = F_s_w_tz[:, :, na, na, :]
         # move v=0 to correct position for the FFT
         p_tvxz = self.get_p("tvxz", density=True, light_weighted=False)
         v = (v_edg[:-1] + v_edg[1:]) / 2.0
@@ -458,19 +456,32 @@ class Component(object):
             bounds_error=True,
         )
         F_p_tvxz = interpolator(np.linspace(0, 1, F_s_w_tz.shape[1]))
-        if batch:
+        if batch=='none':
+            dtz = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
+            F_s_w_tz = F_s_w_tz[:, :, na, na, :]
+            F_y = F_s_w_tz * F_p_tvxz
+            y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
+            y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
+        elif batch=='column':
             nl = ssps.Xw.shape[0]
             y = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
-            dtz = dtz[:,:,:,0,:]
-            F_s_w_tz = F_s_w_tz[:,:,:,0,:]
+            dtz = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,na,na,:]
+            F_s_w_tz = F_s_w_tz[:, :, na, :]
             for i in range(self.cube.ny):
                 F_y_i = F_s_w_tz * F_p_tvxz[:,:,:,i,:]
                 y_i = np.fft.irfft(F_y_i, ssps.n_fft, axis=1)
                 y[:,:,i] = np.sum(y_i * dtz,(0,3))*self.cube.dx*self.cube.dy
+        elif batch=='spaxel':
+            nl = ssps.Xw.shape[0]
+            y = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
+            dtz = ssps.delta_t[:,na,na]*ssps.delta_z[na,na,:]
+            for i in range(self.cube.nx):
+                for j in range(self.cube.ny):
+                    F_y_ij = F_s_w_tz * F_p_tvxz[:,:,i,j,:]
+                    y_ij = np.fft.irfft(F_y_ij, ssps.n_fft, axis=1)
+                    y[:,i,j] = np.sum(y_ij*dtz,(0,2))*self.cube.dx*self.cube.dy
         else:
-            F_y = F_s_w_tz * F_p_tvxz
-            y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
-            y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
+            raise ValueError('Unknown option for batch')
         self.ybar = y
 
     def _get_log_p_t(self, density=True, light_weighted=False):

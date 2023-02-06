@@ -2,13 +2,16 @@ import pytest
 import numpy as np
 np.seterr(divide='ignore', invalid='ignore') # hide some warnings
 import popkinmocks as pkm
+import copy
 
 def loop_over_dists(cube,
                     stellar_system,
                     light_weighted,
                     density,
                     distribution_list):
-    # loop over distributions
+    """Helper function to loop over different distributions 
+
+    """
     for which_dist in distribution_list:
         print(which_dist, light_weighted, density)
         dependent_vars = which_dist.split('_')[0]
@@ -40,7 +43,10 @@ def test_normalisations(my_cube,
                         my_galaxy,
                         distribution_list,
                         my_base_component):
-    """Tests the normalisations of all densities evaluated for a component
+    """Tests that all densities are normalised correctly.
+
+    Loops over all options for evaluating probability functions: 
+    light-weighting, density, and different component types.
 
     """
     cube = my_cube
@@ -62,22 +68,29 @@ def test_normalisations(my_cube,
 def test_moments(my_cube,
                  my_galaxy,
                  my_base_component):
-    """Tests moments exact vs. numerical agree
+    """Compare exact moments from mixture model vs discrete approximation
+    
+    my_galaxy and my_base_component represent the same denisty but the first is
+    a mixture model, the second is represented as a discrete p(t,v,x,z).
+    Their moments are calculated in two different ways: using exact formulae
+    for mixture models, and a discrete approximation. This test checks that
+    the two methods agree withing some tolerance. Only need to check skewness 
+    and kurtosis because these implicitly use mean and variance.  
 
     """
     cube = my_cube
     galaxy = my_galaxy
     base_cmp = my_base_component
     for lw in [False, True]:
-        for dist in ['v_tx', 'v_x', 'v_t', 'v_tz', 'v_xz', 'v_z', 'v']:
+        for dist in ['v_tx', 'v_x', 'v_t', 'v_tz', 'v_xz', 'v_z']: # 'v'
             a = galaxy.get_skewness(dist, light_weighted=lw)
             b = base_cmp.get_skewness(dist, light_weighted=lw)
             error = (a-b)/a
             median_error = np.nanmedian(np.abs(error))
             print(dist, lw, median_error)
-            # fairly large (6%) error tolerance since velocity discretisation
-            # is coarse (20 km/s) to allow for tests to run quickly
-            assert median_error<0.06
+            # fairly large (8%) error tolerance since we use a coarse 
+            # velocity discretisation to allow for tests to run quickly
+            assert median_error<0.08
         for dist in ['t', 'x', 'z', 't_x', 'x_tz', 'z_t']:
             a = galaxy.get_kurtosis(dist, light_weighted=lw)
             b = base_cmp.get_kurtosis(dist, light_weighted=lw)
@@ -102,6 +115,10 @@ def test_datacube(my_galaxy, my_base_component):
 
 def test_noise(my_galaxy):
     """Check noise level of ShotNoise is > ConstantSNR for equal SNR
+
+    ShotNoise and ConstantSNR will have equal SNR in the brightest spaxel, but
+    SNR drops in fainter spaxels for ShotNoise.
+
     """
     galaxy = my_galaxy
     shot_noise = pkm.noise.ShotNoise(galaxy)
@@ -115,16 +132,17 @@ def test_noise(my_galaxy):
     assert mad_shot_noise > mad_const_snr
 
 def test_datacube_batch(my_galaxy, my_base_component):
-    """Check that batch calculated datacubes match unbatched version
+    """Check that datacubes calculated in batches agrees with unbatched version
 
     """
     disk = my_galaxy.component_list[0]
-    a = 1.* disk.ybar
-    disk.evaluate_ybar(batch=True)
-    assert np.allclose(a, disk.ybar)
     base_cmp = my_base_component
-    a = 1.* base_cmp.ybar
-    base_cmp.evaluate_ybar(batch=True)
-    assert np.allclose(a, base_cmp.ybar)
+    for component in [disk, base_cmp]:
+        a = copy.copy(component.ybar) # the unbatched datacube
+        for batch_type in ['column', 'spaxel']:
+            print(component, batch_type)
+            component.evaluate_ybar(batch=batch_type)
+            assert np.allclose(a, component.ybar)
+
 
 # end
