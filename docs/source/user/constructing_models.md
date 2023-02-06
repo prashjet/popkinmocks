@@ -33,7 +33,7 @@ The first four options are related via the following inheritance diagram:
 
 Parameterised components are based on simple analytic equations while simulations can provide more physically self-consistent models. Different types of components have customised methods to improve various calculations e.g.:
 
-* we use analytic Fourier transforms to evaluate datacubes for parameterised components,
+* we use exact expressions for Fourier transforms to evaluate datacubes for parameterised components,
 * we use [exact expressions](https://en.wikipedia.org/wiki/Mixture_distribution#Moments) to evaluate moments for mixture components.
 
 This notebook will demonstrate each option. To ensure that these examples run quickly when building the documentation, we will restrict the size of the problem to something manageable: we _thin_ the parameters of our SSP grid, and use fairly coarse spatial and velocity discretisations for the cube:
@@ -113,7 +113,7 @@ p(t, v, \textbf{x}, z) = p(t) p(\textbf{x}|t) p(v|t,\textbf{x}) p(z|t,\textbf{x}
 \label{eq:factor_p}
 $$
 
-Note that in the final term above, the metallicty distribution is not conditional on velocity. This implies that metallicities and velocities are conditionally independent given age and position.
+The velocity factor $p(v|t,\textbf{x})$ depends on stellar age and position but not on metallicity. This is a simplifying assumption we have used to speed up evaluation of datacubes for `ParametricComponents`.
 
 The remaining assumptions are specific choices of the factors in $\eqref{eq:factor_p}$. Some of these are shared across all instances of `ParametricComponent`, while some are implemented for individual subclasses (i.e. `GrowingDisk` or `Stream`):
 
@@ -159,7 +159,7 @@ disk.set_p_t(lmd=30., phi=0.5)
 _ = cube.plot('t', disk.get_p('t'))
 ```
 
-We will next set the spatial, velocity, and metallicity factors of $\eqref{eq:factor_p}$. To resemble flattened disks, all three factors are chosen to be functions of elliptical radius $r_q$ with flattening $q$,
+We will next set the spatial, velocity, and metallicity factors of $\eqref{eq:factor_p}$. To resemble galactic disks, we want elliptical isocontours for all three factors. We therefore chose them to be functions of elliptical radius $r_q$ with flattening $q$, i.e.
 
 $$
   r_q(\textbf{x}) = \sqrt{x_1^2 + \left( \frac{x_2}{q} \right)^2}.

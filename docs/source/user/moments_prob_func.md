@@ -76,7 +76,7 @@ Since `density=False`, these should be close to one when summed over the velocit
 np.allclose(np.sum(p_v_x, 0), 1.)
 ```
 
-`Mixture` components can additionally take a third argument `collapse_cmps` (default `False`). If `True`, then the returned distribution is split by mixture components, e.g.
+`Mixture` components can additionally take a third argument `collapse_cmps` (default `True`). If `collapse_cmps=False`, then the returned distribution is split by mixture components, e.g.
 
 ```{code-cell}
 p_x = galaxy.get_p('x', light_weighted=True, density=False, collapse_cmps=False)
@@ -147,9 +147,9 @@ There are four main methods for evaluating moments:
 
 which are all wrappers around the underlying methods `get_central_moment` and `get_noncentral_moment`.
 
-Rules for constructing valid input strings are similar to those given [above](dist_strings). One difference is that moments are only defined for distributions over one variable i.e. it makes sense to talk about the variance of $p(z)$ but not of $p(t,z)$ since we don't know whether the variance is with respect to $t$ or $z$. For this reason `get_variance('z')` is valid while `get_variance('tz')` is not. Similarly, conditional moments work for distributions with a single dependent variable only.
+Rules for constructing valid input strings are similar to those given [above](dist_strings). One difference is that moments are only defined for distributions over one variable i.e. it makes sense to talk about the variance of $p(z)$ but not of $p(t,z)$ since we don't know whether the variance is with respect to $t$ or $z$. For this reason `get_variance('z')` is valid while `get_variance('tz')` is not. Higher order cross-moments (e.g. covariance) will be implemented in the future.
 
-In general, the returned moments are scalar if the input distribution is marginal, or has the same shape as the conditioners if the input distribution is conditional. There is an exception is for the vector variable $\textbf{x}=(x_1,x_2)$, which will return two values corresponding to $(x_1, x_2)$,
+In general, the returned moment is scalar if the input distribution is marginal, or has the same shape as the conditioners if the input distribution is conditional. There is an exception for the vector variable $\textbf{x}=(x_1,x_2)$, which will return two values corresponding to $(x_1, x_2)$,
 
 ```{code-cell}
 mean_x = galaxy.get_mean('x')
@@ -170,7 +170,7 @@ As before, you can also evaluate light weighted quantities e.g. to evaluate a sk
 
 ```{code-cell}
 skew_v_x = galaxy.get_skewness('v_x', light_weighted=True)
-cube.imshow(skew_v_x)
+_ = cube.imshow(skew_v_x)
 ```
 
 (light_weight)=

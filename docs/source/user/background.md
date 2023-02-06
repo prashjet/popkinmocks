@@ -24,7 +24,7 @@ _popkinmocks_ describes the stellar content of galaxies as a joint probability d
 * 2D on-sky position $\mathbf{x}$, and
 * metallicity $z$.
 
-A simple (AKA single) stellar population (SSP) is a population of stars born at the same time and having the same initial chemical composition. In _popkinmocks_ we use a specific set of models ([Miles](http://miles.iac.es/pages/ssp-models.php)) for the spectra of SSPs. Let's look at the spectrum of one SSP:
+A simple (AKA single) stellar population (SSP) is a population of stars born at the same time and having the same initial chemical composition. In _popkinmocks_ we use the ([MILES models](http://miles.iac.es/pages/ssp-models.php)) to represent the spectra of SSPs. Let's look at the spectrum of one SSP:
 
 ```{code-cell}
 import popkinmocks as pkm
@@ -41,7 +41,7 @@ _ = plt.gca().set_xlabel('Wavelength [Ang.]')
 _ = plt.gca().set_ylabel('Flux')
 ```
 
-Stellar kinematics refer to the velocities and positions of stars within a galaxy. The joint distribution $p(t, v, \textbf{x}, z)$ can provide a full description of the relations between stellar population and kinematic variables.
+Stellar kinematics refer to the velocities and positions of stars within a galaxy. The joint distribution $p(t, v, \textbf{x}, z)$ encodes a complete description of the relations between stellar population and kinematic variables.
 
 ## IFU datacubes
 
@@ -112,7 +112,13 @@ where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are minor labellings of $y, p$ an
 
 ## Discretisation
 
-_popkinmocks_ perfroms calculations using discrete approximations to the continuous variables $(t, v, \textbf{x}, z)$. The discretisation in $t$ and $z$ is set by the SSP grid; there are options available when instantiating SSP models which modify the range and sampling of these parameters. Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
+_popkinmocks_ perfroms calculations using discrete approximations to the continuous variables $(t, v, \textbf{x}, z)$. The discretisation in $t$ and $z$ is set by the SSP grid; there are options available when instantiating SSP models which control this grid e.g.
+
+```{code-cell}
+ssps = pkm.milesSSPs(thin_age=3, z_lim=(-1, 0), lmd_min=5000, lmd_max=6000)
+```
+
+Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,
 
 ```{code-cell}
 cube = pkm.ifu_cube.IFUCube(
@@ -121,11 +127,18 @@ cube = pkm.ifu_cube.IFUCube(
   nx2=21, x2rng=(-1,1),      # arbitrary units
   nv=30, vrng=(-1000,1000)   # km/s
 )
+```
+
+The shape of the discretisation in all variables is given by
+
+```
 cube.get_distribution_shape('tvxz')
 ```
 
-This shape corresponds to the size of each variable in the string `tvxz` i.e. $(t, v, x_1, x_2, z)$. To see the values of metallicity, for example:
+which corresponds to the size of each variable in the string `tvxz` i.e. $(t, v, x_1, x_2, z)$. To get the values of metallicity,
 
 ```{code-cell}
 cube.get_variable_values('z')
 ```
+
+and likewise for the other variables.

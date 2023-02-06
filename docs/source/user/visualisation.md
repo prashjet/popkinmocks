@@ -44,7 +44,6 @@ _ = cube.plot('t', sfh, '-o')
 The wrapper inserts the the appropriate x-axis labels and values in physical units. Another option is to use an x-axis spacing which highlights the discretisation of the SSP models,
 
 ```{code-cell}
-sfh = stream.get_p('t')
 _ = cube.plot('t', sfh, '-o', xspacing='discrete')
 ```
 

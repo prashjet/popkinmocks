@@ -13,20 +13,20 @@ kernelspec:
 
 # Observation Noise
 
-Here we present noise models available in _popkinmocks_. Noise $\epsilon$ is added to the signal $\bar{y}$ to give the observed cube $y_\mathrm{obs}$, i.e.
+Here we present noise models available in _popkinmocks_. Noise $\epsilon$ is added to the signal $\bar{y}$ to give the observed cube $y_\mathrm{obs}$,
 
 $$
 y_\mathrm{obs}(\mathbf{x},\omega) = 
   \bar{y}(\mathbf{x},\omega) + \epsilon(\mathbf{x},\omega).
 $$
 
-Currently we assume that noise is un-correlated between spaxels and Gaussian i.e. $\epsilon(\mathbf{x},\omega)$ is sampled from a normal distribution with variance $\sigma(\mathbf{x},\omega)^2$, i.e.
+Currently we assume that noise is un-correlated between spaxels and Gaussian i.e. $\epsilon(\mathbf{x},\omega)$ is sampled from a normal distribution with variance $\sigma(\mathbf{x},\omega)^2$,
 
 $$
-\epsilon(\mathbf{x},\omega) \sim \mathcal{N}(0, \sigma(\mathbf{x},\omega)^2)
+\epsilon(\mathbf{x},\omega) \sim \mathcal{N}(0, \sigma(\mathbf{x},\omega)^2).
 $$
 
-We provide two models for $\sigma(\mathbf{x},\omega)$. We demonstrate these on the mixture model saved in the [Constructing Models](constructing_models.md) page:
+We provide two models for $\sigma(\mathbf{x},\omega)$. To demonstrate these, I'll use the mixture model we saved on the [Constructing Models](constructing_models.md) page:
 
 ```{code-cell}
 import numpy as np
@@ -92,4 +92,4 @@ ax[1].set_title('Outer, faint pixel')
 fig.tight_layout()
 ```
 
-In the bright central pixel (left) the SNRs of the two noise models are equal. At the outer pixel (right) the SNR of the `ShotNoise` model has decreased in line with the decreased flux, while for `ConstantSNR` it remains high.
+In the bright central pixel (left) the SNRs of the two noise models are equal, both with SNR=100. At the outer pixel (right) the SNR of the `ShotNoise` model has decreased in line with the decreased flux, while for `ConstantSNR` the SNR remains high.
