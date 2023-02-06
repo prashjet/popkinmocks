@@ -75,6 +75,6 @@ html_theme = "sphinx_book_theme"
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_title = f"popkinmocks v{version}"
+html_title = f"popkinmocks"
 html_logo = "_static/popkinmocks_logo.png"
 html_favicon = "_static/popkinmocks_logo.png"
