@@ -92,8 +92,8 @@ def test_moments(my_cube,
             # velocity discretisation to allow for tests to run quickly
             assert median_error<0.08
         for dist in ['t', 'x', 'z', 't_x', 'x_tz', 'z_t']:
-            a = galaxy.get_kurtosis(dist, light_weighted=lw)
-            b = base_cmp.get_kurtosis(dist, light_weighted=lw)
+            a = galaxy.get_excess_kurtosis(dist, light_weighted=lw)
+            b = base_cmp.get_excess_kurtosis(dist, light_weighted=lw)
             error = (a-b)/a
             median_error = np.nanmedian(np.abs(error))
             print(dist, lw, median_error)
@@ -144,5 +144,22 @@ def test_datacube_batch(my_galaxy, my_base_component):
             component.evaluate_ybar(batch=batch_type)
             assert np.allclose(a, component.ybar)
 
+def test_from_particle(my_cube):
+    """Check that datacubes calculated in batches agrees with unbatched version
+
+    """
+    cube = my_cube
+    N = 10
+    t = np.random.uniform(0, 13, N) # age [Gyr]
+    v = np.random.normal(0, 200., N) # LOS velocity [km/s]
+    x1 = np.random.normal(0, 0.4, N) # x1 position [arbitary]
+    x2 = np.random.normal(0, 0.2, N) # x2 position [arbitary]
+    z = np.random.uniform(-2.5, 0.6, N) # metallicty [M/H]
+    simulation = pkm.components.FromParticle(cube, t, v, x1, x2, z)
+    p_tz = simulation.get_p('tz', density=True)
+    t_edg = cube.get_variable_edges('t')
+    z_edg = cube.get_variable_edges('z')
+    p_tz2, _, _ = np.histogram2d(t, z, bins=(t_edg, z_edg), density=True)
+    assert np.allclose(p_tz, p_tz2)
 
 # end
