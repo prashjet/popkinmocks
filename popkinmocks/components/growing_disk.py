@@ -116,14 +116,20 @@ class GrowingDisk(parametric.ParametricComponent):
     def set_mu_v(
         self, q_lims=(0.5, 0.5), rmax_lims=(0.1, 1.0), vmax_lims=(50.0, 250.0)
     ):
-        """Set age-and-space dependent mean velocities resembling rotating disks
+        """Set age/space dependent mean velocities which resemble rotating disks
 
         Mean velocity maps have rotation-curves along x-axis peaking at v_max at
-        r_max then falling to 0 for r->inf. Given by the equation:
-        E[p(v|t,[x,y])] = cos(theta) * Kr/(r+rc)^3
+        r_max then falling to 0 for r->inf. Given by the equation
+
+        .. math::
+            \mathbb{E}[p(v|t,r,\\theta)] = \cos(\\theta) \\frac{Kr}{(r+rc)^3}
+        
         where
-        r^2 = x^2 + (y/q)^2,  theta = arctan(x/(y/q))
-        K and rc are chosen to give peak velocity vmax at distance rmax.
+
+        .. math::
+            r^2 = x_1^2 + \left( \\frac{x_2}{q} \\right)^2, \;\; \\theta=\\arctan \\frac{qx_1}{x_2}
+
+        Parameters K and rc are chosen to give peak velocity vmax at x_1 = rmax.
         The quantities q, rmax and vmax vary linearly with t between the values
         specified for (young, old) stars.
 
