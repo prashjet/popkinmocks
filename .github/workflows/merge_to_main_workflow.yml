@@ -5,16 +5,18 @@ on:
       - 'main'
 jobs:
   run:
-    runs-on: ubuntu-latest
-    os: ubuntu-latest
-    python-version: 3.11
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.11"]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-    - name: Setup Python 3.11 for ubuntu-latest
+    - name: Setup Python ${{ matrix.python-version }} for ${{ matrix.os }}
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.x'
     - name: Install Python dependencies
       uses: py-actions/py-dependency-install@v3
     - name: Generate Report
