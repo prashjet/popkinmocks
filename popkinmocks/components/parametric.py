@@ -331,7 +331,7 @@ class ParametricComponent(base.Component):
             log_p_z_tx = (log_p_z_tx.T + log_dz).T
         return log_p_z_tx
 
-    def evaluate_ybar(self, batch=False):
+    def evaluate_ybar(self, batch='none'):
         """Evaluate the datacube for this component
 
         Evaluate the integral
@@ -345,7 +345,9 @@ class ParametricComponent(base.Component):
         result to `self.ybar`.
 
         Args:
-            batch (bool, optional): evaluate datacube row by row, default False
+            batch (string, optional): one of 'none', 'column', 'spaxel' to 
+                evaluate datacube altogether, column-by-column or 
+                spaxel-by-spaxel
 
         """
         cube = self.cube
@@ -356,30 +358,54 @@ class ParametricComponent(base.Component):
         nl = ssps.FXw.shape[0]
         omega = np.linspace(0, np.pi, nl)
         omega /= ssps.dv
-        omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
-        exponent = -1j * self.mu_v * omega - 0.5 * (self.sig_v * omega) ** 2
-        F_p_v_tx = np.exp(exponent)
         # get FT of SSP templates s(w;t,z)
         F_s_w_tz = ssps.FXw
         F_s_w_tz = np.reshape(F_s_w_tz, (-1,) + ssps.par_dims)
         # get FT of ybar
-        if batch:
+        if batch=='none':
+            omega = omega[:, np.newaxis, np.newaxis, np.newaxis]
+            exponent = -1j * self.mu_v * omega - 0.5 * (self.sig_v * omega) ** 2
+            F_p_v_tx = np.exp(exponent)
+            args = P_txz, F_p_v_tx, F_s_w_tz
+            F_ybar = np.einsum("txyz,wtxy,wzt->wxy", *args, optimize=True)
+            ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
+        elif batch=='column':
             F_ybar = np.zeros(
                 (nl, self.cube.nx, self.cube.ny), 
                 dtype=np.cdouble)
             nl = ssps.Xw.shape[0]
             ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
+            omega = omega[:, np.newaxis, np.newaxis]
             for i in range(self.cube.ny):
-                args = P_txz[:,:,i,:], F_p_v_tx[:,:,:,i], F_s_w_tz
+                exponent = -1j * self.mu_v[:,:,i] * omega - 0.5 * (self.sig_v[:,:,i] * omega) ** 2
+                F_p_v_tx = np.exp(exponent)
+                print(type(self), i, self.cube.ny)
+                args = P_txz[:,:,i,:], F_p_v_tx, F_s_w_tz
                 F_ybar_i = np.einsum("txz,wtx,wzt->wx", *args, optimize=True)
                 ybar[:,:,i] = np.fft.irfft(
                     F_ybar_i, 
                     self.cube.ssps.n_fft, 
                     axis=0)
+        elif batch=='spaxel':
+            F_ybar = np.zeros(
+                (nl, self.cube.nx, self.cube.ny), 
+                dtype=np.cdouble)
+            nl = ssps.Xw.shape[0]
+            ybar = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
+            omega = omega[:, np.newaxis]
+            for i in range(self.cube.nx):
+                for j in range(self.cube.ny):
+                    exponent = -1j * self.mu_v[:,i,j] * omega - 0.5 * (self.sig_v[:,i,j] * omega) ** 2
+                    F_p_v_tx = np.exp(exponent)
+                    print(type(self), i, self.cube.nx, j, self.cube.ny)
+                    args = P_txz[:,i,j,:], F_p_v_tx, F_s_w_tz
+                    F_ybar_i = np.einsum("tz,wt,wzt->w", *args, optimize=True)
+                    ybar[:,i,j] = np.fft.irfft(
+                        F_ybar_i, 
+                        self.cube.ssps.n_fft, 
+                        axis=0)
         else:
-            args = P_txz, F_p_v_tx, F_s_w_tz
-            F_ybar = np.einsum("txyz,wtxy,wzt->wxy", *args, optimize=True)
-            ybar = np.fft.irfft(F_ybar, self.cube.ssps.n_fft, axis=0)
+            raise ValueError('Unknown option for batch')
         self.ybar = ybar
 
     def _get_log_p_t(self, density=True, light_weighted=False):
