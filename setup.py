@@ -39,7 +39,12 @@ setuptools.setup(
         "testing": [
             "pytest",
             "coverage",
-        ]
+        ],
+        "docs": [
+            "sphinx-book-theme",
+            "myst-nb",
+            "ipython",
+        ],
     },
     package_data={
         "popkinmocks": ["../data/MILES_BASTI_CH_baseFe/*"]

@@ -390,16 +390,15 @@ class Component(object):
         kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
         return kurtosis - 3.0
 
-    def evaluate_ybar(self, batch='none'):
+    def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
 
         This evaluates the full integral assuming a 5D joint density i.e.:
 
-        $$
-        \\bar{y}(x, \omega) = int S(\omega-v ; t,z) p(t,v,x,z) dv dt dz
-        $$
+        .. math::
+            \\bar{y}(x, \omega) = \int S(\omega-v ; t,z) p(t,v,x,z) dv dt dz
 
-        where $\omega = \log \lambda$. This integral is a convolution over
+        where omega is log lambda. This integral is a convolution over
         velocity v, which we evaluate using FFTs. FFTs of SSP templates are
         stored in`ssps.FXw` while FFTs of (the velocity part of) the density
         p(t,v,x,z) are evaluated here. Sets the result to `self.ybar`.
@@ -456,32 +455,34 @@ class Component(object):
             bounds_error=True,
         )
         F_p_tvxz = interpolator(np.linspace(0, 1, F_s_w_tz.shape[1]))
-        if batch=='none':
-            dtz = ssps.delta_t[:,na,na,na,na]*ssps.delta_z[na,na,na,na,:]
+        if batch == "none":
+            dtz = ssps.delta_t[:, na, na, na, na] * ssps.delta_z[na, na, na, na, :]
             F_s_w_tz = F_s_w_tz[:, :, na, na, :]
             F_y = F_s_w_tz * F_p_tvxz
             y = np.fft.irfft(F_y, ssps.n_fft, axis=1)
             y = np.sum(y * dtz, (0, 4)) * self.cube.dx * self.cube.dy
-        elif batch=='column':
+        elif batch == "column":
             nl = ssps.Xw.shape[0]
             y = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
-            dtz = ssps.delta_t[:,na,na,na]*ssps.delta_z[na,na,na,:]
+            dtz = ssps.delta_t[:, na, na, na] * ssps.delta_z[na, na, na, :]
             F_s_w_tz = F_s_w_tz[:, :, na, :]
             for i in range(self.cube.ny):
-                F_y_i = F_s_w_tz * F_p_tvxz[:,:,:,i,:]
+                F_y_i = F_s_w_tz * F_p_tvxz[:, :, :, i, :]
                 y_i = np.fft.irfft(F_y_i, ssps.n_fft, axis=1)
-                y[:,:,i] = np.sum(y_i * dtz,(0,3))*self.cube.dx*self.cube.dy
-        elif batch=='spaxel':
+                y[:, :, i] = np.sum(y_i * dtz, (0, 3)) * self.cube.dx * self.cube.dy
+        elif batch == "spaxel":
             nl = ssps.Xw.shape[0]
             y = np.zeros((nl, self.cube.nx, self.cube.ny), dtype=np.float64)
-            dtz = ssps.delta_t[:,na,na]*ssps.delta_z[na,na,:]
+            dtz = ssps.delta_t[:, na, na] * ssps.delta_z[na, na, :]
             for i in range(self.cube.nx):
                 for j in range(self.cube.ny):
-                    F_y_ij = F_s_w_tz * F_p_tvxz[:,:,i,j,:]
+                    F_y_ij = F_s_w_tz * F_p_tvxz[:, :, i, j, :]
                     y_ij = np.fft.irfft(F_y_ij, ssps.n_fft, axis=1)
-                    y[:,i,j] = np.sum(y_ij*dtz,(0,2))*self.cube.dx*self.cube.dy
+                    y[:, i, j] = (
+                        np.sum(y_ij * dtz, (0, 2)) * self.cube.dx * self.cube.dy
+                    )
         else:
-            raise ValueError('Unknown option for batch')
+            raise ValueError("Unknown option for batch")
         self.ybar = y
 
     def _get_log_p_t(self, density=True, light_weighted=False):
@@ -796,7 +797,7 @@ class Component(object):
         """Save the component in `npz` format. Deprecated for `dill_dump`.
 
         Saves various quantities about the cube and component in a `npz` file.
-        The density $p(t,v,x,z)$ is rearranged to $p(x,v,z,t)$ for backward
+        The density p(t,v,x,z) is rearranged to p(x,v,z,t) for backward
         compatibility with v0.0.
 
         Args:
