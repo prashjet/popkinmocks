@@ -39,6 +39,18 @@ def loop_over_dists(cube,
             # allow for nan in conditionals since denominator can be 0
             assert np.all(np.isclose(total_prob, 1.) | np.isnan(total_prob))
 
+
+def test_cube(my_cube):
+    """Test sizes of variable edge/value arrays are concordant
+
+    """
+    cube = my_cube
+    for var in ['t', 'v', 'x1', 'x2', 'z']:
+        var_edgs = cube.get_variable_edges(var)
+        var_cent = cube.get_variable_values(var)
+        assert var_edgs.size == var_cent.size + 1
+
+
 def test_normalisations(my_cube,
                         my_galaxy,
                         distribution_list,
@@ -161,5 +173,20 @@ def test_from_particle(my_cube):
     z_edg = cube.get_variable_edges('z')
     p_tz2, _, _ = np.histogram2d(t, z, bins=(t_edg, z_edg), density=True)
     assert np.allclose(p_tz, p_tz2)
+
+
+def test_plotting(my_cube, my_base_component):
+    """Test plotting routines
+
+    """
+    base_cmp = my_base_component
+    cube = my_cube
+    p_tz = base_cmp.get_p('tz', density=False)
+    p_t = base_cmp.get_p('t', density=False)
+    ax_img = cube.imshow(p_tz, view=['t', 'z'])
+    ax_plt = cube.plot('t', p_t, xspacing='discrete')
+    lineplt_ydata = ax_plt.lines[0].get_ydata()
+    image2d_ydata = np.sum(ax_img.get_images()[0].get_array(), 0)
+    np.allclose(lineplt_ydata, image2d_ydata)
 
 # end
