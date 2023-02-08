@@ -390,6 +390,112 @@ class Component(object):
         kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
         return kurtosis - 3.0
 
+    def get_covariance(self, which_dist, light_weighted=False):
+        """Get covariance or conditional covariance of a 2D distribution
+
+        For two variables a,b out of ('t', 'v', 'x', 'z') get their covariance
+
+        .. math::
+            \mathbb{Cov}(a,b)=\int p(a,b)(a-\mathbb{E}(a))(b-\mathbb{E}(b))\;da\;db
+
+        or conditional covariance given a third variable c,
+
+        .. math::
+            \mathbb{Cov}(a,b|c)=\int p(a,b|c)(a-\mathbb{E}(a|c))(b-\mathbb{E}(b|c))\;da\;db
+
+        where integrals estimated via summation over discretisation bins in a/b.
+
+        Args:
+            which_dist (string): a bivariate distribution to take covariance of
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the covariance or conditional covariance
+
+        """
+
+        if "_" in which_dist:
+            is_conditional = True
+            dependent_vars, conditioners = which_dist.split("_")
+        else:
+            is_conditional = False
+            dependent_vars = which_dist
+        if len(dependent_vars)!=2:
+            raise ValueError('Should be exactly two dependent variables')
+        means = []
+        values = []
+        for i in [0,1]:
+            dvar = dependent_vars[i]
+            tmp_dist = dvar
+            if is_conditional:
+                tmp_dist += f'_{conditioners}'
+            means += [self.get_mean(tmp_dist, light_weighted=light_weighted)]
+            if dvar != 'x':
+                values += [self.cube.get_variable_values(dvar)]
+            else:
+                x1 = self.cube.get_variable_values('x1')
+                x2 = self.cube.get_variable_values('x2')
+                values += [(x1,x2)]
+        p = self.get_p(which_dist, density=False, light_weighted=light_weighted)
+        na = np.newaxis
+        if 'x' not in dependent_vars:
+            delta_var0 = (values[0] - means[0][na].T).T
+            delta_var1 = (values[1] - means[1][na].T).T
+            integrand = p * delta_var0[:,na] * delta_var1[na,:]
+            covariance = np.sum(integrand, (0,1))
+        else:
+            idx_x = dependent_vars.find('x')
+            idx_notx = 1 - idx_x # i.e 0 if idx_x=1, 1 otherwise
+            delta_x1 = (values[idx_x][0] - means[idx_x][0][na].T).T 
+            delta_x2 = (values[idx_x][1] - means[idx_x][1][na].T).T 
+            delta_notx = (values[idx_notx] - means[idx_notx][na].T).T
+            if idx_x == 0:
+                intgrnd_x1 = np.sum(p, 1) * delta_x1[:,na] * delta_notx[na,:]
+                intgrnd_x2 = np.sum(p, 0) * delta_x2[:,na] * delta_notx[na,:]
+            else:
+                intgrnd_x1 = np.sum(p, 2) * delta_x1[na,:] * delta_notx[:,na]
+                intgrnd_x2 = np.sum(p, 1) * delta_x2[na,:] * delta_notx[:,na]
+            covar_x1 = np.sum(intgrnd_x1, (0,1))
+            covar_x2 = np.sum(intgrnd_x2, (0,1))
+            covariance = np.array([covar_x1, covar_x2])
+        return covariance
+
+    def get_correlation(self, which_dist, light_weighted=False):
+        """Get correlation or conditional correlation of a 2D distribution
+
+        .. math::
+            \mathbb{Cor}(a,b|c) = \\frac{\mathbb{Cov}(a,b|c)}{\sqrt{\mathbb{Var}(a|c)\mathbb{Var}(b|c)}}
+
+        Args:
+            which_dist (string): a bivariate distribution to take covariance of
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the correlation or conditional correlation
+
+        """
+        if "_" in which_dist:
+            is_conditional = True
+            dependent_vars, conditioners = which_dist.split("_")
+        else:
+            is_conditional = False
+            dependent_vars = which_dist
+        if len(dependent_vars)!=2:
+            raise ValueError('Should be exactly two dependent variables')
+        covariance = self.get_covariance(which_dist, light_weighted=light_weighted)
+        tmp0 = dependent_vars[0]
+        if is_conditional:
+            tmp0 += f'_{conditioners}'
+        variance0 = self.get_variance(tmp0, light_weighted=light_weighted)
+        tmp1 = dependent_vars[1]
+        if is_conditional:
+            tmp1 += f'_{conditioners}'
+        variance1 = self.get_variance(tmp1, light_weighted=light_weighted)
+        correlation = covariance/(variance0*variance1)**0.5
+        return correlation
+
     def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
 

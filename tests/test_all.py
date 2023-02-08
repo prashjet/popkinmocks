@@ -77,6 +77,7 @@ def test_normalisations(my_cube,
     component1 = galaxy.component_list[0]
     loop_over_dists(cube, component1, True, True, distribution_list)
 
+
 def test_moments(my_cube,
                  my_galaxy,
                  my_base_component):
@@ -111,6 +112,7 @@ def test_moments(my_cube,
             print(dist, lw, median_error)
             assert median_error<1e-10
 
+
 def test_datacube(my_galaxy, my_base_component):
     """Check that datacubes computed using two different methods agree.
     
@@ -124,6 +126,7 @@ def test_datacube(my_galaxy, my_base_component):
     base_cmp = my_base_component
     error = (galaxy.ybar - base_cmp.ybar)/galaxy.ybar
     assert np.median(np.abs(error)) < 0.0005 # i.e. 0.05% error
+
 
 def test_noise(my_galaxy):
     """Check noise level of ShotNoise is > ConstantSNR for equal SNR
@@ -143,6 +146,7 @@ def test_noise(my_galaxy):
     mad_const_snr = np.median(np.abs(eps_const_snr))
     assert mad_shot_noise > mad_const_snr
 
+
 def test_datacube_batch(my_galaxy, my_base_component):
     """Check that datacubes calculated in batches agrees with unbatched version
 
@@ -155,6 +159,7 @@ def test_datacube_batch(my_galaxy, my_base_component):
             print(component, batch_type)
             component.evaluate_ybar(batch=batch_type)
             assert np.allclose(a, component.ybar)
+
 
 def test_from_particle(my_cube):
     """Check that datacubes calculated in batches agrees with unbatched version
@@ -188,5 +193,36 @@ def test_plotting(my_cube, my_base_component):
     lineplt_ydata = ax_plt.lines[0].get_ydata()
     image2d_ydata = np.sum(ax_img.get_images()[0].get_array(), 0)
     np.allclose(lineplt_ydata, image2d_ydata)
+
+
+def test_correlation(my_galaxy, n_check=3):
+    """Test that correlation coefficients rho satisfty -1 < rho < 1
+
+    Generate three random bivarite marginal or conditional distributions - e.g.
+    tv, xz_t, tv_xz - and check that the correlation coefficients 
+
+    """
+    galaxy = my_galaxy
+    def random_distribution_generator():
+        all_vars = ['t', 'v', 'x', 'z']
+        dependent_vars = np.random.choice(all_vars, 2, replace=False)
+        dependent_vars = np.sort(dependent_vars)
+        which_dist = "".join(dependent_vars) # list of strings to string
+        n_conditioners = np.random.choice([0,1,2], 1)[0]
+        if n_conditioners>0:
+            remaining_vars = np.setdiff1d(all_vars, dependent_vars)
+            conditioners = np.random.choice(
+                remaining_vars, 
+                n_conditioners, 
+                replace=False)
+            conditioners = np.sort(conditioners)
+            which_dist = f'{which_dist}_{"".join(conditioners)}'
+        return which_dist
+    for i in range(n_check):
+        which_dist = random_distribution_generator()
+        print(i, which_dist)
+        correlation = galaxy.get_correlation(which_dist)
+        assert np.nanmin(correlation) >= -1.
+        assert np.nanmax(correlation) <= 1.
 
 # end
