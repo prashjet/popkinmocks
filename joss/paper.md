@@ -3,9 +3,9 @@ title: 'popkinmocks: mock IFU datacubes for modelling stellar populations and ki
 tags:
   - Python
   - astronomy
-  - dynamics
-  - galactic dynamics
-  - milky way
+  - spectroscopy
+  - stellar-populations
+  - stellar-kinematics
 authors:
   - name: Prashin Jethwa
     orcid: 0000-0003-0010-8129
@@ -20,81 +20,26 @@ bibliography: paper.bib
 
 # Summary
 
-The forces on stars, galaxies, and dark matter under external gravitational
-fields lead to the dynamical evolution of structures in the universe. The orbits
-of these bodies are therefore key to understanding the formation, history, and
-future state of galaxies. The field of "galactic dynamics," which aims to model
-the gravitating components of galaxies to study their structure and evolution,
-is now well-established, commonly taught, and frequently used in astronomy.
-Aside from toy problems and demonstrations, the majority of problems require
-efficient numerical tools, many of which require the same base code (e.g., for
-performing numerical orbit integration).
+Hello!
+
+over stellar age $t$, velocity $v$, position $\textbf{x}$ and metallicity $z$
 
 # Statement of need
 
-`Gala` is an Astropy-affiliated Python package for galactic dynamics. Python
-enables wrapping low-level languages (e.g., C) for speed without losing
-flexibility or ease-of-use in the user-interface. The API for `Gala` was
-designed to provide a class-based and user-friendly interface to fast (C or
-Cython-optimized) implementations of common operations such as gravitational
-potential and force evaluation, orbit integration, dynamical transformations,
-and chaos indicators for nonlinear dynamics. `Gala` also relies heavily on and
-interfaces well with the implementations of physical units and astronomical
-coordinate systems in the `Astropy` package [@astropy] (`astropy.units` and
-`astropy.coordinates`).
+`popkinmocks` uniquely provides the ability to provide mock IFU observations of highly idealised galaxy models. The ability to create mock observations in an idealised setting is crucial for developing new methods for data analysis and inference. By stripping away complexities, the developer can understand the power and limitations of their method without confusion from undesired features in the mock data. All other existing software to produce mock IFU observations (listed below) do so using simulation particles. The inherent stochasticity in simulations is idealised-away in `popkinmocks`, which can produce mock data not only from simulation particles but also from exact, smooth models based on analytic equations.
 
-`Gala` was designed to be used by both astronomical researchers and by
-students in courses on gravitational dynamics or astronomy. It has already been
-used in a number of scientific publications [@Pearson:2017] and has also been
-used in graduate courses on Galactic dynamics to, e.g., provide interactive
-visualizations of textbook material [@Binney:2008]. The combination of speed,
-design, and support for Astropy functionality in `Gala` will enable exciting
-scientific explorations of forthcoming data releases from the *Gaia* mission
-[@gaia] by students and experts alike.
+@PNKR:2022 presented a novel inference method applied to mock data created with `popkinmocks`. Since this initial use, the software has grown into more complete library with potential for wide appeal. One unique feature of the `popkinmocks` library is its formulation in probabilistic terminology. We represent a galaxy as a probability density $p(t, v, \textbf{x}, z)$. Various moments and projections of this density are familiar objects for any galactic astrophysicist, e.g. the conditional mean of $p(v|\textbf{x})$ is more commonly called a mean velocity map. The `popkinmocks` API puts the probabilistic formulation front-and-center,
 
-# Mathematics
+```
+mean_velocity_map = galaxy.get_mean('v_x')
+```
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
+By presenting a unified view of familiar objects such as the mean velocity map $\mathbb{E}(v|\textbf{x})$, star formation history $p(t)$, or age-metallity relation $p(t,z)$, the hope is that `popkinmocks` may lower the barrier for astrophysicists to consider less familiar and higher-dimensional projections of $p(t, v, \textbf{x}, z)$.
 
-Double dollars make self-standing equations:
-
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
-
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
-
-# Citations
-
-Citations to entries in paper.bib should be in
-[rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
-format.
-
-If you want to cite a software repository URL (e.g. something on GitHub without a preferred
-citation) then you can do it with the example BibTeX entry below for @fidgit.
-
-For a quick reference, the following citation commands can be used:
-- `@author:2001`  ->  "Author et al. (2001)"
-- `[@author:2001]` -> "(Author et al., 2001)"
-- `[@author1:2001; @author2:2001]` -> "(Author1 et al., 2001; Author2 et al., 2002)"
-
-# Figures
-
-Figures can be included like this:
-![Caption for example figure.\label{fig:example}](figure.png)
-and referenced from text using \autoref{fig:example}.
-
-Figure sizes can be customized by adding an optional second parameter:
-![Caption for example figure.](figure.png){ width=20% }
+Existing software for mock IFU observations include `simspin`[@SIMSPIN], `RealSim-IFS` [@RealSim-IFS], and the (currently private) code behind the iMaNGA project [@iMaNGA:2022]. One further novelty of `popkinmocks` compared to these tools is that we realise Doppler shifting via convolutions using Fast Fourier Transforms, while the other tools work on a particle-by-particle approach, shifting a particle's spectrum according to its velocity. This significantly different implementation of a key functionality makes `popkinmocks` a useful alternative which may be more computationally efficient in certain contexts.
 
 # Acknowledgements
 
-We acknowledge contributions from Brigitta Sipocz, Syrtis Major, and Semyeong
-Oh, and support from Kathryn Johnston during the genesis of this project.
+I acknowledge support from the Austrian Science Fund (FWF): F6811-N36 and from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme under grant agreement No 724857 (Consolidator Grant ArcheoDyn).
 
 # References
