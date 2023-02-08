@@ -229,8 +229,8 @@ class IFUCube(object):
             raise ValueError("Unknown `which_variable`")
         return ticks
 
-    def _get_extent(self, which_variable):
-        """Get variable extents for plotting images
+    def get_variable_extent(self, which_variable):
+        """Get outermost bin edges for a given variable
 
         Args:
             which_variable (string): which variable, one of (t, v, x1, x2, z)
@@ -258,7 +258,7 @@ class IFUCube(object):
     def _get_image_extent(self, which_variable):
         """Get extent used for plotting images
 
-        Similar to `self._get_extent` except this returns (0,1) if the variable
+        Similar to `self.get_variable_extent` except this returns (0,1) if the variable
         is in [t,z] as these need special treatment due to irregular
         discretization
 
@@ -267,7 +267,7 @@ class IFUCube(object):
 
         """
         if which_variable in ["x1", "x2", "v"]:
-            ext = self._get_extent(which_variable)
+            ext = self.get_variable_extent(which_variable)
         elif which_variable in ["t", "z"]:
             ext = (0, 1)
         else:
@@ -349,7 +349,7 @@ class IFUCube(object):
             ticks = "default"
         elif xspacing == "discrete":
             x = np.linspace(0, 1, arr.size)
-            extent = self._get_extent(which_var)
+            extent = self.get_variable_extent(which_var)
             ticks = self._get_ticks(which_var)
         img = ax.plot(x, arr, *args, **kwargs)
         if ticks != "default":
