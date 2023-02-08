@@ -147,7 +147,12 @@ def test_datacube_batch(my_galaxy, my_base_component):
 
 
 def test_from_particle(my_cube):
-    """Check that datacubes calculated in batches agrees with unbatched version"""
+    """Check that particle histrogramming is as expected
+
+    Compare two histrogrammed versions of p(t,z), evaluated once using pkm
+    `get_p('tz', ...)` and once using `np.histogram2d`
+
+    """
     cube = my_cube
     N = 10
     t = np.random.uniform(0, 13, N)  # age [Gyr]
@@ -157,9 +162,21 @@ def test_from_particle(my_cube):
     z = np.random.uniform(-2.5, 0.6, N)  # metallicty [M/H]
     simulation = pkm.components.FromParticle(cube, t, v, x1, x2, z)
     p_tz = simulation.get_p("tz", density=True)
+    # filter out lost particles
+    v_rng = cube.get_variable_extent("v")
+    x1_rng = cube.get_variable_extent("x1")
+    x2_rng = cube.get_variable_extent("x2")
+    idx = np.where(
+        (v >= v_rng[0])
+        & (v < v_rng[1])
+        & (x1 >= x1_rng[0])
+        & (x1 < x1_rng[1])
+        & (x2 >= x2_rng[0])
+        & (x2 < x2_rng[1])
+    )
     t_edg = cube.get_variable_edges("t")
     z_edg = cube.get_variable_edges("z")
-    p_tz2, _, _ = np.histogram2d(t, z, bins=(t_edg, z_edg), density=True)
+    p_tz2, _, _ = np.histogram2d(t[idx], z[idx], bins=(t_edg, z_edg), density=True)
     assert np.allclose(p_tz, p_tz2)
 
 
