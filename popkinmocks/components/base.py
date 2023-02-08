@@ -421,43 +421,43 @@ class Component(object):
         else:
             is_conditional = False
             dependent_vars = which_dist
-        if len(dependent_vars)!=2:
-            raise ValueError('Should be exactly two dependent variables')
+        if len(dependent_vars) != 2:
+            raise ValueError("Should be exactly two dependent variables")
         means = []
         values = []
-        for i in [0,1]:
+        for i in [0, 1]:
             dvar = dependent_vars[i]
             tmp_dist = dvar
             if is_conditional:
-                tmp_dist += f'_{conditioners}'
+                tmp_dist += f"_{conditioners}"
             means += [self.get_mean(tmp_dist, light_weighted=light_weighted)]
-            if dvar != 'x':
+            if dvar != "x":
                 values += [self.cube.get_variable_values(dvar)]
             else:
-                x1 = self.cube.get_variable_values('x1')
-                x2 = self.cube.get_variable_values('x2')
-                values += [(x1,x2)]
+                x1 = self.cube.get_variable_values("x1")
+                x2 = self.cube.get_variable_values("x2")
+                values += [(x1, x2)]
         p = self.get_p(which_dist, density=False, light_weighted=light_weighted)
         na = np.newaxis
-        if 'x' not in dependent_vars:
+        if "x" not in dependent_vars:
             delta_var0 = (values[0] - means[0][na].T).T
             delta_var1 = (values[1] - means[1][na].T).T
-            integrand = p * delta_var0[:,na] * delta_var1[na,:]
-            covariance = np.sum(integrand, (0,1))
+            integrand = p * delta_var0[:, na] * delta_var1[na, :]
+            covariance = np.sum(integrand, (0, 1))
         else:
-            idx_x = dependent_vars.find('x')
-            idx_notx = 1 - idx_x # i.e 0 if idx_x=1, 1 otherwise
-            delta_x1 = (values[idx_x][0] - means[idx_x][0][na].T).T 
-            delta_x2 = (values[idx_x][1] - means[idx_x][1][na].T).T 
+            idx_x = dependent_vars.find("x")
+            idx_notx = 1 - idx_x  # i.e 0 if idx_x=1, 1 otherwise
+            delta_x1 = (values[idx_x][0] - means[idx_x][0][na].T).T
+            delta_x2 = (values[idx_x][1] - means[idx_x][1][na].T).T
             delta_notx = (values[idx_notx] - means[idx_notx][na].T).T
             if idx_x == 0:
-                intgrnd_x1 = np.sum(p, 1) * delta_x1[:,na] * delta_notx[na,:]
-                intgrnd_x2 = np.sum(p, 0) * delta_x2[:,na] * delta_notx[na,:]
+                intgrnd_x1 = np.sum(p, 1) * delta_x1[:, na] * delta_notx[na, :]
+                intgrnd_x2 = np.sum(p, 0) * delta_x2[:, na] * delta_notx[na, :]
             else:
-                intgrnd_x1 = np.sum(p, 2) * delta_x1[na,:] * delta_notx[:,na]
-                intgrnd_x2 = np.sum(p, 1) * delta_x2[na,:] * delta_notx[:,na]
-            covar_x1 = np.sum(intgrnd_x1, (0,1))
-            covar_x2 = np.sum(intgrnd_x2, (0,1))
+                intgrnd_x1 = np.sum(p, 2) * delta_x1[na, :] * delta_notx[:, na]
+                intgrnd_x2 = np.sum(p, 1) * delta_x2[na, :] * delta_notx[:, na]
+            covar_x1 = np.sum(intgrnd_x1, (0, 1))
+            covar_x2 = np.sum(intgrnd_x2, (0, 1))
             covariance = np.array([covar_x1, covar_x2])
         return covariance
 
@@ -482,18 +482,18 @@ class Component(object):
         else:
             is_conditional = False
             dependent_vars = which_dist
-        if len(dependent_vars)!=2:
-            raise ValueError('Should be exactly two dependent variables')
+        if len(dependent_vars) != 2:
+            raise ValueError("Should be exactly two dependent variables")
         covariance = self.get_covariance(which_dist, light_weighted=light_weighted)
         tmp0 = dependent_vars[0]
         if is_conditional:
-            tmp0 += f'_{conditioners}'
+            tmp0 += f"_{conditioners}"
         variance0 = self.get_variance(tmp0, light_weighted=light_weighted)
         tmp1 = dependent_vars[1]
         if is_conditional:
-            tmp1 += f'_{conditioners}'
+            tmp1 += f"_{conditioners}"
         variance1 = self.get_variance(tmp1, light_weighted=light_weighted)
-        correlation = covariance/(variance0*variance1)**0.5
+        correlation = covariance / (variance0 * variance1) ** 0.5
         return correlation
 
     def evaluate_ybar(self, batch="none"):

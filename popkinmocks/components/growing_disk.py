@@ -123,7 +123,7 @@ class GrowingDisk(parametric.ParametricComponent):
 
         .. math::
             \mathbb{E}[p(v|t,r,\\theta)] = \cos(\\theta) \\frac{Kr}{(r+rc)^3}
-        
+
         where
 
         .. math::
