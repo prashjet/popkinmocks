@@ -20,7 +20,7 @@ bibliography: paper.bib
 
 # Summary
 
-Integral Field Units (IFUs) are a type of detector which measures both spatial and spectral information. These detectors output 3D data-products known as datacubes: 2D images with a spectrum associated with each image pixel. Beyond the very local Universe where individual stars can be resolved, IFU datacubes are our most information-rich datasets of galaxies, and large samples of these have been observed [e.g. @SAMI_Croom2021].
+Integral Field Units (IFUs) are a type of detector which measure both spatial and spectral information. These detectors output 3D data-products known as datacubes: 2D images with a spectrum associated with each image pixel. Beyond the very local Universe where individual stars can be resolved, IFU datacubes are our most information-rich datasets of galaxies, and large samples of these have been observed [e.g. @SAMI_Croom2021].
 
 Galaxies are built from stars, gas, dust and dark matter. Stars are an especially useful observational probe as many physical properties can be inferred from their spectra. _Stellar populations_ are intrinsic properties such as a star's age or chemical composition, which affect the strengths of spectral absorption lines. _Stellar kinematics_ are the positions and velocities of stars within the galaxy. The component of velocity along the line-of-sight produces Doppler shifting of absorption lines. In the past, stellar populations and kinematics of external galaxies have been modelled separately; often thought of as distinct subfields. Recent work has demonstrated the power of moving beyond this dichotomy to study galaxy evolution [e.g. @Poci2019]. `popkinmocks` is software to create mock observations of IFU datacubes of galaxy stellar light for the era of combined population-kinematic analyses.
 
@@ -40,6 +40,6 @@ Existing software for mock IFU observations include `simspin` [@SIMSPIN], `RealS
 
 # Acknowledgements
 
-I acknowledge support from the Austrian Science Fund (FWF): F6811-N36 and from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme under grant agreement No 724857 (Consolidator Grant ArcheoDyn).
+I acknowledge support from the Austrian Science Fund (FWF): F6811-N36 and from the European Research Council (ERC) under the European Union’s Horizon 2020 research and innovation programme under grant agreement No 724857 (Consolidator Grant ArcheoDyn). I also thank Stefanie Reiter and Christine Ackerl for useful advice.
 
 # References
