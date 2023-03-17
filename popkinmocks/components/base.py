@@ -496,6 +496,91 @@ class Component(object):
         correlation = covariance / (variance0 * variance1) ** 0.5
         return correlation
 
+    def get_l_moment(self, which_dist, j, light_weighted=False):
+        """Get j'th L-moment of a 1D distributions
+
+        L-moments are robust alternatives to conventional moments based on
+        order statistics. This implementation is based on `Hoskins 90`_
+        (equation 2.4). Currently only up to order 4.
+
+        .. _Hoskins 90: https://belinra.inrae.fr/doc_num.php?explnum_id=4675
+
+        Args:
+            which_dist (string): distribution to take L-moment of
+            j (int): moment order (>4 not implemented)
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the central moment or conditional central moment
+
+        """
+        var = which_dist.split("_")[0]
+        assert len(var) == 1
+        if len(which_dist) == 1:
+            marginal = True
+        else:
+            marginal = False
+            conditioners = which_dist.split("_")[1]
+        # get CDF of distribution
+        F = self.get_p(which_dist, density=False)
+        F = np.cumsum(F, axis=0)
+        # append an initial 0 to CDF
+        if marginal:
+            initial_zero = np.array([0.])
+        else:
+            cond_shape = self.cube.get_distribution_shape(conditioners)
+            initial_zero = np.zeros((1,)+cond_shape)
+        print(initial_zero.shape, F.shape)
+        F = np.concatenate((initial_zero, F))
+        dF = F[1:] - F[:-1]
+        # get L-moment integrand y(F)
+        x = self.cube.get_variable_edges(var)
+        if j==1:
+            # we want y = x, but need the following to get the right shape 
+            y = (x * np.ones_like(F).T).T
+        elif j==2:
+            y = (x * (2*F-1.).T).T
+        elif j==3:
+            y = (x * (6.*F**2.-6*F+1.).T).T
+        elif j==4:
+            y = (x * (20.*F**3. -30*F**2 + 12.*F -1.).T).T
+        else:
+            raise NotImplementedError('L-moments only up to order 4')
+        # get L-moment = int_0^1 y(F) dF
+        l_moment = np.sum((y[:-1] + y[1:])/2.*dF, axis=0)
+        return l_moment
+
+    def get_l_mean(self, which_dist, light_weighted=False):
+        l_mean = self.get_l_moment(
+            which_dist, j=1, light_weighted=light_weighted
+            )
+        return l_mean
+
+    def get_l_dispersion(self, which_dist, light_weighted=False):
+        l_dispersion = self.get_l_moment(
+            which_dist, j=2, light_weighted=light_weighted
+            )
+        return l_dispersion
+
+    def get_l_skewness(self, which_dist, light_weighted=False):
+        l_dispersion = self.get_l_dispersion(
+            which_dist, light_weighted=light_weighted
+            )
+        lambda3 = self.get_l_moment(
+            which_dist, j=3, light_weighted=light_weighted
+            )
+        return lambda3/l_dispersion
+
+    def get_l_kurtosis(self, which_dist, light_weighted=False):
+        l_dispersion = self.get_l_dispersion(
+            which_dist, light_weighted=light_weighted
+            )
+        lambda4 = self.get_l_moment(
+            which_dist, j=4, light_weighted=light_weighted
+            )
+        return lambda4/l_dispersion
+
     def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
 
