@@ -11,8 +11,10 @@ popkinmocks
 Models in `popkinmocks` are distributions over stellar population and kinematic parameters. These can be created either using particle data from simulations, or a provided library of parametric galactic components. Given a model, `popkinmocks` provides tools to evaluate the stellar integrated-light contribution to the IFU datacube, and derived properties of the distribution such as (mass or light weighted) moments, and conditional and marginal probability functions.
 
 `popkinmocks` is being actively developed in `a public repository on GitHub
-<https://github.com/prashjet/popkinmocks>`_ so if you have any trouble, `open
-an issue <https://github.com/prashjet/popkinmocks/issues>`_ there.
+<https://github.com/prashjet/popkinmocks>`_. If you have any trouble, `open
+an issue <https://github.com/prashjet/popkinmocks/issues>`_.
+Information about contributing can be found `here
+<user/contributing.html>`_.
 
 Contents
 ---------------------
@@ -23,6 +25,13 @@ Contents
 
    user/install
    user/citation.md
+   user/contributing.md
+   user/code_of_conduct.md
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Tutorials:
+
    user/background.md
    user/constructing_models.md
    user/moments_prob_func.md

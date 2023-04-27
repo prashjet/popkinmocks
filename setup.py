@@ -46,7 +46,5 @@ setuptools.setup(
             "ipython",
         ],
     },
-    package_data={
-        "popkinmocks": ["../data/MILES_BASTI_CH_baseFe/*"]
-    },
+    package_data={"popkinmocks": ["../data/MILES_BASTI_CH_baseFe/*"]},
 )
