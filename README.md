@@ -28,3 +28,6 @@ python -m pip install -e .
 Check out the user guide and API docs on [the docs
 page](https://popkinmocks.readthedocs.io/) for example usage and much more info.
 
+## Contributing
+
+All types of community contributions are very welcome! Please check the [contribution page](https://popkinmocks.readthedocs.io/en/stable/user/contributing.html) for more information.

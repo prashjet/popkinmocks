@@ -88,7 +88,7 @@ $$
 \end{equation}
 $$
 
-This is the forward-model is used in most typical analyses of binned spectra from IFU datacubes i.e. a binned spectrum extracted at a position $\textbf{x}$ is modelled as a superposition of SSPs weighted by $p(t,z|\textbf{x})$ and convolved with a single LOSVD $p(v|\textbf{x})$ which is independent of stellar populations.
+This is the forward-model is used in most typical analyses of binned spectra from IFU datacubes i.e. a binned spectrum extracted at a position $\textbf{x}$ is modelled as a superposition of SSPs weighted by $p(t,z|\textbf{x})$ and convolved with a single line-of-sight velocity distribution (LOSVD) $p(v|\textbf{x})$ which is independent of stellar populations.
 
 ## Evaluating datacubes using FFTs
 

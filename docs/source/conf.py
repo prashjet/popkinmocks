@@ -24,9 +24,9 @@ try:
 except DistributionNotFound:
     __version__ = "unknown version"
 
-project = 'popkinmocks'
-copyright = '2023, Prashin Jethwa'
-author = 'Prashin Jethwa'
+project = "popkinmocks"
+copyright = "2023, Prashin Jethwa"
+author = "Prashin Jethwa"
 
 # The full version, including alpha/beta/rc tags
 version = __version__
@@ -43,7 +43,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
-    'sphinx.ext.graphviz',
+    "sphinx.ext.graphviz",
     "myst_nb",
     "IPython.sphinxext.ipython_console_highlighting",
 ]
@@ -51,11 +51,11 @@ extensions = [
 myst_enable_extensions = ["dollarmath", "colon_fence"]
 
 mathjax3_config = {
-    'TeX': {'equationNumbers': {'autoNumber': 'AMS', 'useLabelIds': True}},
+    "TeX": {"equationNumbers": {"autoNumber": "AMS", "useLabelIds": True}},
 }
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
