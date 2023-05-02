@@ -446,8 +446,10 @@ class Component(object):
             float/array: the ex-kurtosis or conditional ex-kurtosis
 
         """
-        kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
-        return kurtosis - 3.0
+        exkurtosis = self.get_excess_central_moment(
+            which_dist, 4, light_weighted=light_weighted
+            )
+        return exkurtosis
 
     def get_covariance(self, which_dist, light_weighted=False):
         """Get covariance or conditional covariance of a 2D distribution
@@ -660,6 +662,13 @@ class Component(object):
             4,
             light_weighted=light_weighted)
         return l_kurtosis
+
+    def get_excess_l_kurtosis(self, which_dist, light_weighted=False):
+        excess_l_kurtosis = self.get_excess_l_moment(
+            which_dist,
+            4,
+            light_weighted=light_weighted)
+        return excess_l_kurtosis
 
     def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
