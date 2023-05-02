@@ -6,6 +6,7 @@
 [![codecov](https://codecov.io/gh/prashjet/popkinmocks/branch/main/graph/badge.svg?token=Y7DD57E8NZ)](https://codecov.io/gh/prashjet/popkinmocks)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Documentation Status](https://readthedocs.org/projects/popkinmocks/badge/?version=latest)](https://popkinmocks.readthedocs.io/en/latest/?badge=latest)
+[![status](https://joss.theoj.org/papers/8ac74475656358c47ac2569953c09d6d/status.svg)](https://joss.theoj.org/papers/8ac74475656358c47ac2569953c09d6d)
 
 # popkinmocks
 
