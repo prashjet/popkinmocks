@@ -175,7 +175,7 @@ _ = cube.imshow(skew_v_x)
 
 ## L-Moments
 
-In addition to standard moments, `popkinmocks` offers the option to calculate [L-moments](http://miles.iac.es/pages/ssp-models.php). These are robust alternatives to conventional moments based on order statistics. They can be evaluated similarly to standard moments, via the methods:
+In addition to standard moments, `popkinmocks` offers the option to calculate [L-moments](https://en.wikipedia.org/wiki/L-moment). These are robust alternatives to conventional moments based on order statistics. They can be evaluated similarly to standard moments, via the methods:
 
 - `get_l_mean`,
 - `get_l_variance`,
