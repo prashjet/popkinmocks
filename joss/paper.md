@@ -1,5 +1,5 @@
 ---
-title: 'popkinmocks: mock IFU datacubes for modelling stellar populations and kinematics.'
+title: 'popkinmocks: mock IFU datacubes for modelling stellar populations and kinematics'
 tags:
   - Python
   - astronomy
