@@ -112,10 +112,10 @@ where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are minor labellings of $y, p$ an
 
 ## Discretisation
 
-_popkinmocks_ perfroms calculations using discrete approximations to the continuous variables $(t, v, \textbf{x}, z)$. The discretisation in $t$ and $z$ is set by the SSP grid; there are options available when instantiating SSP models which control this grid e.g.
+_popkinmocks_ perfroms calculations using discrete approximations to the continuous variables $(t, v, \textbf{x}, z)$. The discretisation in $t$ and $z$ is set by the SSP grid. There are options available when instantiating SSP models to control this grid. For example, to (i) downsample the number of ages by a factor of three, (ii) limit metallicities to the range (-1,0), and (iii) restrict wavelengths to 5000-6000 angstroms, you would instantiate the SSP grid as follows:
 
 ```{code-cell}
-ssps = pkm.milesSSPs(thin_age=3, z_lim=(-1, 0), lmd_min=5000, lmd_max=6000)
+ssps = pkm.milesSSPs(age_rebin=3, z_lim=(-1, 0), lmd_min=5000, lmd_max=6000)
 ```
 
 Discretisation in the spatial dimensions $\textbf{x}=(x_1, x_2)$ and velocity $v$ are chosen when instantiating the `IFUCube` object,

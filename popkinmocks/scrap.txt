@@ -1,0 +1,27 @@
+self.ssps._logarithmically_resample(dv=dv)
+ssps.dv
+ssps.w
+ssps.Xw
+ssps.speed_of_light
+
+self.ssps._calculate_fourier_transform()
+ssps.FXw
+ssps.n_fft
+
+self.ssps.get_light_weights()
+ssps.light_weights
+
+ssps.img_t_ticks
+ssps.t_ticks
+ssps.img_z_ticks
+ssps.z_ticks
+
+ssps.delta_t
+ssps.delta_z
+ssps.par_cents
+ssps.par_edges
+ssps.par_dims
+
+ssps.lmd
+
+TODO : test `_rebin_par_grid`... does it do as expected?

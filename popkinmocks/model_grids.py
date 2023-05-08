@@ -90,20 +90,20 @@ class milesSSPs(modelGrid):
         lmd_min (float) : max wavelength (Angstrom)
         age_lim (tuple) : (min, max) ages to keep (Gyr)
         z_lim (tuple) : (min, max) metallicities to keep [M/H]
-        thin_age (int) : only use every `thin_age`-th age in SSP grid
-        thin_z (int) : only use every `thin_z`-th metallicity in SSP grid
+        age_rebin (int) : downsampling factor for number of SSP ages
+        z_rebin (int) : downsampling factor for number of SSP metallicities
 
     """
 
     def __init__(
-        self, lmd_min=4700, lmd_max=6500, age_lim=None, z_lim=None, thin_age=1, thin_z=1
+        self, lmd_min=4700, lmd_max=6500, age_lim=None, z_lim=None, age_rebin=1, z_rebin=1
     ):
         ssps = read_miles.milesSSPs(
             mod_dir="MILES_BASTI_CH_baseFe",
             age_lim=age_lim,
             z_lim=z_lim,
-            thin_age=thin_age,
-            thin_z=thin_z,
+            thin_age=1,
+            thin_z=1,
         )
         ssps.truncate_wavelengths(lmd_min=lmd_min, lmd_max=lmd_max)
         n = ssps.X.shape[0]
@@ -137,6 +137,50 @@ class milesSSPs(modelGrid):
         self.delta_t = tmp[1:] - tmp[:-1]
         tmp = self.par_edges[0]
         self.delta_z = tmp[1:] - tmp[:-1]
+        self._rebin_par_grid(age_rebin=age_rebin, z_rebin=z_rebin)
+
+    def _rebin_par_grid(self, age_rebin=1, z_rebin=1):
+        new_z_edges = self.par_edges[0][::z_rebin]
+        if new_z_edges[-1]!=self.par_edges[0][-1]:
+            new_z_edges = np.concatenate((new_z_edges, [self.par_edges[0][-1]]))
+        new_z_cents = (new_z_edges[1:] + new_z_edges[:-1])/2.
+        new_delta_z = new_z_edges[1:] - new_z_edges[:-1]
+        new_t_edges = self.par_edges[1][::age_rebin]
+        if new_t_edges[-1]!=self.par_edges[1][-1]:
+            new_t_edges = np.concatenate((new_t_edges, [self.par_edges[1][-1]]))
+        new_t_cents = (new_t_edges[1:] + new_t_edges[:-1])/2.
+        new_delta_t = new_t_edges[1:] - new_t_edges[:-1]
+        new_par_cents = [new_z_cents, new_t_cents]
+        new_par_edges = [new_z_edges, new_t_edges]
+        new_par_dims = (new_z_cents.size, new_t_cents.size)
+        X = self.X.reshape((-1,) + self.par_dims)
+        new_X = np.zeros((X.shape[0],) + tuple(new_par_dims))
+        na = np.newaxis
+        dzdt = self.delta_z[:,na] * self.delta_t[na,:]
+        Xdzdt = X*dzdt
+        for i in range(new_par_dims[0]): # loop over z
+           for j in range(new_par_dims[1]): # loop over t
+                z0 = i*z_rebin
+                if new_z_edges[i+1]==self.par_edges[0][-1]:
+                    z1 = None
+                else:
+                   z1 = (i+1)*z_rebin
+                z_slc = slice(z0,z1)
+                t0 = j*age_rebin
+                if new_t_edges[j+1]==self.par_edges[1][-1]:
+                   t1 = None
+                else:
+                   t1 = (j+1)*age_rebin
+                t_slc = slice(t0,t1)
+                new_X[:,i,j] = np.sum(Xdzdt[:,z_slc,t_slc],(1,2))
+                new_X[:,i,j] /= np.sum(dzdt[z_slc,t_slc])
+        new_X = new_X.reshape((new_X.shape[0],) + (-1,))
+        self.delta_t = new_delta_t
+        self.delta_z = new_delta_z
+        self.par_cents = new_par_cents
+        self.par_edges = new_par_edges
+        self.par_dims = new_par_dims
+        self.X = new_X
 
     def _get_par_edge_lims(self, x_cnt):
         dx = x_cnt[1:] - x_cnt[:-1]
