@@ -143,9 +143,9 @@ There are four main methods for evaluating moments:
 - `get_mean`,
 - `get_variance`,
 - `get_skewness`,
-- `get_kurtosis`,
+- `get_kurtosis`, or `get_excess_kurtosis`,
 
-which are all wrappers around the underlying methods `get_central_moment` and `get_noncentral_moment`.
+while the method `get_excess_central_moment` can be used for arbitrary higher order.
 
 Rules for constructing valid input strings are similar to those given [above](dist_strings). One difference is that moments are only defined for distributions over one variable i.e. it makes sense to talk about the variance of $p(z)$ but not of $p(t,z)$ since we don't know whether the variance is with respect to $t$ or $z$. For this reason `get_variance('z')` is valid while `get_variance('tz')` is not. To calculate 2D covariances [see below](covar). 
 
@@ -172,6 +172,57 @@ As before, you can also evaluate light weighted quantities e.g. to evaluate a sk
 skew_v_x = galaxy.get_skewness('v_x', light_weighted=True)
 _ = cube.imshow(skew_v_x)
 ```
+
+## L-Moments
+
+In addition to standard moments, `popkinmocks` offers the option to calculate [L-moments](https://en.wikipedia.org/wiki/L-moment). These are robust alternatives to conventional moments based on order statistics. They can be evaluated similarly to standard moments, via the methods:
+
+- `get_l_mean`,
+- `get_l_variance`,
+- `get_l_skewness`,
+- `get_l_kurtosis`, or `get_excess_l_kurtosis`,
+
+while the method `get_excess_l_moment` can be used for arbitrary higher orders.
+
+To see why we need more robust alternatives to conventional moments, consider the following. Let's create copy of our example galaxy (using the a [base component](base_component) class), where we slightly perturb the underlying density. Specifically, we add a density spike for large negative velocities in spaxel $(5,5)$:
+
+```{code-cell}
+log_p_tvxz = galaxy.get_log_p('tvxz')
+log_p_tvxz[:,0,5,5,:] += 21. # add density to leftmost velocity bin, spaxel (5,5)
+gal_perturbed = pkm.components.Component(cube=cube, log_p_tvxz=log_p_tvxz)
+```
+
+The resulting change to the velocity distributions is the (barely visible) spike on the leftmost side of this plot:
+
+```{code-cell}
+p_v_x = galaxy.get_p('v_x')
+p_v_x_perturbed = gal_perturbed.get_p('v_x')
+cube.plot('v', p_v_x[:,5,5])
+cube.plot('v', p_v_x_perturbed[:,5,5], '--', label='perturbed')
+_ = plt.legend()
+```
+
+Though this spike is barely visible, the resulting change in the velocity skewness at that position is substantial compared to before:
+
+```{code-cell}
+skew_v_x_perturbed = gal_perturbed.get_skewness('v_x', light_weighted=True)
+_ = cube.imshow(skew_v_x_perturbed)
+```
+
+The L-skewness, on the other hand, is far more robust to this small perturbation:
+
+```{code-cell}
+l_skew_v_x = galaxy.get_l_skewness('v_x', light_weighted=True)
+l_skew_v_x_perturbed = gal_perturbed.get_l_skewness('v_x', light_weighted=True)
+
+fig, ax = plt.subplots(1,2)
+cube.imshow(l_skew_v_x, ax=ax[0], colorbar=False, label_ax=False)
+cube.imshow(l_skew_v_x_perturbed, ax=ax[1], colorbar=False, label_ax=False)
+ax[0].set_title('L-skewness, original')
+_ = ax[1].set_title('L-skewness, perturbed')
+```
+
+This robustness derives from the fact that L-moments are linear statistics, as opposed to higher-order statistics such as skewness which is cubic in the abscissa values. Perturbations such as the one we have manually inserted here can more realistically arise when the density is reconstructed from observed, noisy data. In these cases, L-moments may be preferred to the conventional moments.
 
 (covar)=
 ## Covariances and Correlations

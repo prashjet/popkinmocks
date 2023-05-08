@@ -225,4 +225,28 @@ def test_correlation(my_galaxy, n_check=3):
         assert np.nanmax(correlation) <= 1.0
 
 
+def test_l_moments(my_base_component):
+    """Test implementation of L-moments
+
+    Checks that L-mean is (almost) equal to mean, and L-skewness and L-kurtosis
+    are between -1 and 1.
+
+    """
+    cmp = my_base_component
+    for lw in [False, True]:
+        for dist in ["v_x"]:  # add examples with "v_tz", "x", "t", "t_x", "z_t"
+            # check L-mean = mean
+            mean = cmp.get_mean(dist, light_weighted=lw)
+            l_mean = cmp.get_l_mean(dist, light_weighted=lw)
+            error = l_mean/mean - 1.
+            median_error = np.nanmedian(np.abs(error))
+            print(dist, lw, median_error)
+            assert median_error < 0.01
+            # check |L-skewness| < 1
+            l_skewness = cmp.get_l_skewness(dist, light_weighted=lw)
+            assert np.all(np.abs(l_skewness)<=1.)
+            # check |L-kurtosis| < 1
+            l_kurtosis = cmp.get_l_skewness(dist, light_weighted=lw)
+            assert np.all(np.abs(l_kurtosis)<=1.)
+
 # end

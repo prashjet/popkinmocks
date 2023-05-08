@@ -426,6 +426,7 @@ _ = plt.gca().set_title('Mixture model: skewness of $p(v|x)$')
 
 shows the stream clearly superimposed across the disk.
 
+(base_component)=
 ## Pixel representation of $p(t, v, \textbf{x}, z)$
 
 Another option to create a model is to directly from a pixelated representation of $p(t, v, \textbf{x}, z)$. This can be done with the base `Component` class. For better numerical precision, we actually use the log density $\log p(t, v, \textbf{x}, z)$ instead of the density itself.

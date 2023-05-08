@@ -1,5 +1,5 @@
 import numpy as np
-from scipy import interpolate, special
+from scipy import interpolate, special, stats
 import copy
 from functools import partial
 import os
@@ -332,6 +332,65 @@ class Component(object):
         variance = self.get_central_moment(which_dist, 2, light_weighted=light_weighted)
         return variance
 
+    def get_dispersion(self, which_dist, light_weighted=False):
+        """Get standard deviation of a 1D distribution
+
+        See full docstring of `self.get_mean` for restrictions on `which_dist`
+        and meaning of output.
+
+        Args:
+            which_dist (string): which distribution to take SD of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the sd or conditional sd
+
+        """
+        variance = self.get_central_moment(which_dist, 2, light_weighted=light_weighted)
+        sd = variance**0.5
+        return sd
+
+    def get_normalised_central_moment(self, which_dist, j, light_weighted=False):
+        """Get normalised central moment of a 1D distribution
+
+        (Normalised central moment)(j) = (central moment)(j)/dispersion**j 
+
+        Args:
+            which_dist (string): which distribution to take normalised central 
+                moment of.
+            j (int) : moment order
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the normalised central (/conditional?) moment
+
+        """
+        central_moment = self.get_central_moment(
+            which_dist, j, light_weighted=light_weighted
+            )
+        dispersion = self.get_dispersion(
+            which_dist, light_weighted=light_weighted
+            )
+        normalised_central_moment = central_moment/dispersion**j
+        return normalised_central_moment
+    
+    def get_normalised_central_moment_normal(self, j):
+        if j%2 == 0:
+            nrm_mom = special.factorial2(j-1)
+        else:
+            nrm_mom = 0.
+        return nrm_mom
+
+    def get_excess_central_moment(self, which_dist, j, light_weighted=False):
+        nrm_central_moment = self.get_normalised_central_moment(
+            which_dist, j, light_weighted=light_weighted
+            )
+        nrm_moment_normal = self.get_normalised_central_moment_normal(j)
+        excess_central_moment = nrm_central_moment - nrm_moment_normal
+        return excess_central_moment
+
     def get_skewness(self, which_dist, light_weighted=False):
         """Get skewness of a 1D distribution
 
@@ -347,9 +406,9 @@ class Component(object):
             float/array: the variance or conditional skewness
 
         """
-        mu_3 = self.get_central_moment(which_dist, 3, light_weighted=light_weighted)
-        variance = self.get_variance(which_dist, light_weighted=light_weighted)
-        skewness = mu_3 / variance**1.5
+        skewness = self.get_normalised_central_moment(
+            which_dist, 3, light_weighted=light_weighted
+            )
         return skewness
 
     def get_kurtosis(self, which_dist, light_weighted=False):
@@ -367,9 +426,9 @@ class Component(object):
             float/array: the kurtosis or conditional kurtosis
 
         """
-        mu_4 = self.get_central_moment(which_dist, 4, light_weighted=light_weighted)
-        variance = self.get_variance(which_dist, light_weighted=light_weighted)
-        kurtosis = mu_4 / variance**2.0
+        kurtosis = self.get_normalised_central_moment(
+            which_dist, 4, light_weighted=light_weighted
+            )
         return kurtosis
 
     def get_excess_kurtosis(self, which_dist, light_weighted=False):
@@ -387,8 +446,10 @@ class Component(object):
             float/array: the ex-kurtosis or conditional ex-kurtosis
 
         """
-        kurtosis = self.get_kurtosis(which_dist, light_weighted=light_weighted)
-        return kurtosis - 3.0
+        exkurtosis = self.get_excess_central_moment(
+            which_dist, 4, light_weighted=light_weighted
+            )
+        return exkurtosis
 
     def get_covariance(self, which_dist, light_weighted=False):
         """Get covariance or conditional covariance of a 2D distribution
@@ -495,6 +556,235 @@ class Component(object):
         variance1 = self.get_variance(tmp1, light_weighted=light_weighted)
         correlation = covariance / (variance0 * variance1) ** 0.5
         return correlation
+
+    def get_l_moment(self, which_dist, j, light_weighted=False):
+        """Get j'th L-moment of a 1D distributions
+
+        L-moments are robust alternatives to conventional moments based on
+        order statistics. Implementation is based on Eq. 2.4 of  `Hoskins 90`_
+
+        .. _Hoskins 90: https://belinra.inrae.fr/doc_num.php?explnum_id=4675
+
+        Args:
+            which_dist (string): distribution to take L-moment of
+            j (int): moment order
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the central moment or conditional central moment
+
+        """
+        var = which_dist.split("_")[0]
+        assert len(var) == 1
+        if len(which_dist) == 1:
+            marginal = True
+        else:
+            marginal = False
+            conditioners = which_dist.split("_")[1]
+        # get CDF of distribution
+        F = self.get_p(which_dist, density=False, light_weighted=light_weighted)
+        F = np.cumsum(F, axis=0)
+        # append an initial 0 to CDF
+        if marginal:
+            initial_zero = np.array([0.])
+        else:
+            cond_shape = self.cube.get_distribution_shape(conditioners)
+            initial_zero = np.zeros((1,)+cond_shape)
+        F = np.concatenate((initial_zero, F))
+        dF = F[1:] - F[:-1]
+        # get L-moment
+        poly = special.legendre(j-1)
+        g = poly(2*F-1.)
+        x = self.cube.get_variable_edges(var)
+        y = (x * g.T).T
+        l_moment = np.sum((y[:-1] + y[1:])/2.*dF, axis=0)
+        return l_moment
+
+    def get_l_mean(self, which_dist, light_weighted=False):
+        """Get L-mean of a 1D distribution
+
+        The L-mean is a robust alternative to the mean. See docstring of 
+        `self.get_l_moment` for more. The docstring of `self.get_mean` lists
+        restrictions on `which_dist` and describes the shape of the output.
+
+        Args:
+            which_dist (string): which distribution to take L-mean of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the L-mean or conditional L-mean
+
+        """
+        l_mean = self.get_l_moment(
+            which_dist, j=1, light_weighted=light_weighted
+            )
+        return l_mean
+
+    def get_l_dispersion(self, which_dist, light_weighted=False):
+        """Get L-dispersion of a 1D distribution
+
+        The L-dispersion is a robust alternative to dispersion. See docstr of 
+        `self.get_l_moment` for more. The docstring of `self.get_mean` lists
+        restrictions on `which_dist` and describes the shape of the output.
+
+        Args:
+            which_dist (string): which distribution to take L-dispersion of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the L-dispersion or conditional L-dispersion
+
+        """
+        l_dispersion = self.get_l_moment(
+            which_dist, j=2, light_weighted=light_weighted
+            )
+        return l_dispersion
+
+    def get_normalised_l_moment(self, which_dist, j, light_weighted=False):
+        """Get normalised L-moment of a 1D distribution
+
+        L-moments are robust alternatives to moments (see docstring of 
+        `self.get_l_moment` for more). Normalised L-moments are dimensionless
+        quantities, scaled by the L-dispersion. This is analogous to e.g. 
+        skewness being dimensionless third central momnent, scaled by standard
+        deviation. The docstring of `self.get_mean` lists restrictions on 
+        `which_dist` and describes the shape of the output.
+
+        Args:
+            which_dist (string): which distribution to take L-dispersion of.
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the normalised L-moment or conditional L-moment
+
+        """
+        l_dispersion = self.get_l_dispersion(
+            which_dist, light_weighted=light_weighted
+            )
+        lambda_j = self.get_l_moment(
+            which_dist, j=j, light_weighted=light_weighted
+            )
+        return lambda_j/l_dispersion
+
+    def get_l_moment_normal(self, j):
+        """Get L-moment of a unit normal distribution
+
+        Args:
+            j (int): order of moment
+
+        Returns:
+            float: the L-moment of a unit normal distribution
+
+        """
+        nrm = stats.norm(0,1)
+        poly = special.legendre(j-1)
+        F_edg = np.linspace(0, 1, 100000)
+        dF = F_edg[1:] - F_edg[:-1]
+        F_cnt = (F_edg[:-1] + F_edg[1:])/2.
+        x = nrm.ppf(F_cnt)
+        g = poly(2*F_cnt-1.)
+        y = x*g
+        l_moment_normal = np.sum(y*dF)
+        if np.isclose(l_moment_normal, 0.):
+            l_moment_normal = 0.
+        return l_moment_normal
+
+    def get_normalised_l_moment_normal(self, j):
+        """Get normalised L-moment of a unit normal distribution
+
+        Args:
+            j (int): order of moment
+
+        Returns:
+            float: the normalised L-moment of a unit normal distribution
+
+        """
+        l_moment_normal = self.get_l_moment_normal(j)
+        l2_normal = self.get_l_moment_normal(2)
+        return l_moment_normal/l2_normal
+
+    def get_excess_l_moment(self, which_dist, j, light_weighted=False):
+        """Get excess L-moment of a 1D distrbution
+        
+        (Even) L-moments are not zero-centered for normal distributions. We
+        define the excess L-moment to be the normalised L-moment subtract the
+        equivalent order normalised L-moment of a normal distributions (in
+        analgy with excess kurtosis vs kurtosis).
+        
+        Args:
+            which_dist (string): which distribution to take ex. L-moment of
+            j (int): order of moment
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the exces L-moment of a unit normal distribution
+
+        """
+        l_moment = self.get_normalised_l_moment(
+            which_dist,
+            j,
+            light_weighted=light_weighted)
+        l_moment_normal = self.get_normalised_l_moment_normal(j)
+        return l_moment - l_moment_normal
+        
+    def get_l_skewness(self, which_dist, light_weighted=False):
+        """Get L-skewness of a 1D distrbution
+        
+        Args:
+            which_dist (string): which distribution to take L-skewness of
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the L-skewness of the distribution
+
+        """
+        l_skewness = self.get_normalised_l_moment(
+            which_dist,
+            3,
+            light_weighted=light_weighted)
+        return l_skewness
+
+    def get_l_kurtosis(self, which_dist, light_weighted=False):
+        """Get L-kurtosis of a 1D distrbution
+        
+        Args:
+            which_dist (string): which distribution to take L-kurtosis of
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the L-kurtosis of the distribution
+
+        """
+        l_kurtosis = self.get_normalised_l_moment(
+            which_dist,
+            4,
+            light_weighted=light_weighted)
+        return l_kurtosis
+
+    def get_excess_l_kurtosis(self, which_dist, light_weighted=False):
+        """Get excess L-kurtosis of a 1D distrbution
+        
+        Args:
+            which_dist (string): which distribution to get excess L-kurtosis of
+            light_weighted (bool): whether to return light-weighted (True) or
+                mass-weighted (False) quantity
+
+        Returns:
+            float/array: the excess L-kurtosis of the distribution
+
+        """
+        excess_l_kurtosis = self.get_excess_l_moment(
+            which_dist,
+            4,
+            light_weighted=light_weighted)
+        return excess_l_kurtosis
 
     def evaluate_ybar(self, batch="none"):
         """Evaluate the datacube for this component
