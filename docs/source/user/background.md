@@ -108,7 +108,7 @@ $$
 \end{equation}
 $$
 
-where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are minor labellings of $y, p$ and $S$ (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT), producing a datacube sampled in log wavelength $\omega$ rather than wavelength $\lambda$.
+where $\tilde{y}$, $\tilde{p}$ and $\tilde{S}$ are minor labellings of $y, p$ and $S$ (see Section 2.2.1 of [Ocvirk et. al](https://ui.adsabs.harvard.edu/abs/2006MNRAS.365...74O/abstract) for details). _popkinmocks_ evaluates this convolution using a Fast Fourier Transform (FFT), producing a datacube sampled in log wavelength $\omega$ rather than linear wavelength $\lambda$.
 
 ## Discretisation
 
@@ -142,3 +142,11 @@ cube.get_variable_values('z')
 ```
 
 and likewise for the other variables.
+
+The grid of log wavelength values is stored at `ssps.w`, while the original linear wavelength grid is stored at `ssps.lmd`:
+
+```{code-cell}
+print(ssps.w.shape, ssps.lmd.shape)
+```
+
+Note that these two arrays have different sizes: the linear grid size is set by the native SSP wavelength resolution, while the log spacing is set by the velocity resolution that you use choose when creating the `IFUCube` object. Indeed, the SSPs will only have the attribute `ssps.w` once they are used to create an `IFUCube`.

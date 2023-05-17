@@ -36,7 +36,7 @@ Parameterised components are based on simple analytic equations while simulation
 * we use exact expressions for Fourier transforms to evaluate datacubes for parameterised components,
 * we use [exact expressions](https://en.wikipedia.org/wiki/Mixture_distribution#Moments) to evaluate moments for mixture components.
 
-This notebook will demonstrate each option. To ensure that these examples run quickly when building the documentation, we will restrict the size of the problem to something manageable: we _thin_ the parameters of our SSP grid, and use fairly coarse spatial and velocity discretisations for the cube:
+This notebook will demonstrate each option. To ensure that these examples run quickly when building the documentation, we will restrict the size of the problem to something manageable: we downsample the parameters of our SSP grid using the `rebin` parameters, and use fairly coarse spatial and velocity discretisations for the cube:
 
 ```{code-cell}
 import numpy as np
@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 
 import popkinmocks as pkm
 
-ssps = pkm.milesSSPs(thin_age=6, thin_z=2)
+ssps = pkm.milesSSPs(age_rebin=6, z_rebin=2)
 cube = pkm.ifu_cube.IFUCube(
   ssps=ssps, nx1=21, nx2=21, nv=25, vrng=(-1000,1000)
   )
