@@ -237,7 +237,7 @@ class milesSSPs(modelGrid):
         tmp = np.linspace(0, 1, self.par_dims[0] + 1)
         self.img_z_ticks = np.interp(z_ticks, self.par_edges[0], tmp)
 
-    def _logarithmically_resample(self, dv=5.0):
+    def _logarithmically_resample(self, dv=5.0, interp_kind="cubic"):
         """Logarithmically resample the SSPs with given velocity spacing
 
         Interpolates the SSPs with even spacing in log-wavelength set by dv
@@ -250,7 +250,7 @@ class milesSSPs(modelGrid):
         dw = dv / speed_of_light
         w_in = np.log(self.lmd)
         f = interpolate.interp1d(
-            w_in, self.X.T, kind="cubic", bounds_error=False, fill_value=0.0
+            w_in, self.X.T, kind=interp_kind, bounds_error=False, fill_value=0.0
         )
         w = np.arange(np.min(w_in), np.max(w_in), dw)
         Xw = f(w).T

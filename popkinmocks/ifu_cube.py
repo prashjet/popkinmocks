@@ -13,6 +13,7 @@ class IFUCube(object):
         x1rng (tuple): start/end co-ordinates in x1 (arbitrary units)
         x2rng (tuple): start/end co-ordinates in x2 (arbitrary units)
         vrng (tuple): start/end velocities in km/s
+        interp_kind (string): type of interpolation for SSPs default = 'cubic'
 
     """
 
@@ -25,6 +26,7 @@ class IFUCube(object):
         x1rng=(-1, 1),
         x2rng=(-1, 1),
         vrng=(-1000, 1000),
+        interp_kind="cubic"
     ):
         self.ssps = ssps
         self.nx = nx1
@@ -43,7 +45,7 @@ class IFUCube(object):
         self.nv = nv
         self.v_edg = np.linspace(*vrng, nv + 1)
         dv = self.v_edg[1] - self.v_edg[0]
-        self.ssps._logarithmically_resample(dv=dv)
+        self.ssps._logarithmically_resample(dv=dv, interp_kind=interp_kind)
         self.ssps._calculate_fourier_transform()
         self.ssps.get_light_weights()
 
