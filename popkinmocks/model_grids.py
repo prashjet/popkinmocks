@@ -30,7 +30,7 @@ class modelGrid:
         check = np.array(self.par_lims).shape == (self.npars, 2)
         if check is False:
             raise ValueError("par_lims is wrong shape")
-        if np.product(self.par_dims) > 1e5:
+        if np.prod(self.par_dims) > 1e5:
             raise ValueError("total size of par grid > 1e5")
         if self.par_mask_function is not None:
             # evaluate par_mask_function on zero-array to check input shape
@@ -69,7 +69,7 @@ class modelGrid:
             par_mask_1d = self.par_mask_function(pars)
         else:
             par_mask_nd = np.zeros(self.par_dims, dtype=bool)
-            par_mask_1d = np.zeros(np.product(self.par_dims), dtype=bool)
+            par_mask_1d = np.zeros(np.prod(self.par_dims), dtype=bool)
         self.par_mask_nd = par_mask_nd
         unmasked = par_mask_1d == False
         pars = pars[:, unmasked]
